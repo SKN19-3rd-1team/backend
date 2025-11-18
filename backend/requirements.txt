@@ -1,0 +1,7 @@
+langchain
+langgraph
+pandas
+pyarrow
+fastapi
+uvicorn
+python-dotenv

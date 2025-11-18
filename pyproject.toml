@@ -1,0 +1,9 @@
+[project]
+name = 'major-mentor-bot'
+version = '0.1.0'
+description = 'LangGraph + LangChain prototype for the Major Mentor bot.'
+requires-python = '>=3.10'
+
+[tool.major-mentor-bot]
+backend-path = 'backend'
+frontend-path = 'frontend'
