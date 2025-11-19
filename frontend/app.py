@@ -8,6 +8,13 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT_DIR))
 
 from backend.main import run_mentor
+from backend.config import get_settings
+
+settings = get_settings()
+print(
+    f"[Mentor Console] Using provider '{settings.llm_provider}' "
+    f"with model '{settings.model_name}'"
+)
 
 st.set_page_config(page_title="전공 탐색 멘토", page_icon="🎓", layout="wide")
 
