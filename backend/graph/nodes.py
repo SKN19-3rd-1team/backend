@@ -1,13 +1,15 @@
 # backend/graph/nodes.py
 from typing import List
 from langchain_core.documents import Document
-from langchain_openai import ChatOpenAI  # 또는 sLLM
 from langgraph.prebuilt import ToolNode
 from langgraph.constants import END
+
 from .state import MentorState
 from backend.rag.retriever import get_retriever
 
-llm = ChatOpenAI(model="gpt-4.1-mini")  # 예시
+from backend.config import get_llm
+
+llm = get_llm()
 
 def retrieve_node(state: MentorState) -> MentorState:
     retriever = get_retriever()
