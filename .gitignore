@@ -1,3 +1,7 @@
+# vscocde
+.vscode
+.claude
+
 # Key
 .env
 
@@ -7,3 +11,7 @@ __pycache__
 # data
 backend/data/chroma_db
 backend/data/
+
+# AGENTS
+AGENTS.md
+CLAUDE.md

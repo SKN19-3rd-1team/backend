@@ -1,16 +1,20 @@
 # langchain_practice
 
 ## 실행 순서
+
 프로젝트를 처음부터 끝까지 실행하기 위해 필요한 명령어들을 순서대로 정리했습니다.
 
 1. **환경 변수 파일 생성**
+
    ```bash
    cp .env.example .env          # Windows PowerShell: copy .env.example .env
    ```
+
    - 발급받은 `OPENAI_API_KEY`, `HUGGINGFACEHUB_API_TOKEN`, `LANGCHAIN_API_KEY`를 `.env`에 채웁니다.
    - `RAW_JSON`, `VECTORSTORE_DIR`, `LLM_PROVIDER`, `MODEL_NAME`, `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL_NAME` 등을 환경에 맞게 조정하세요.
 
 2. **가상환경 및 의존성 설치 (최초 1회)**
+
    ```bash
    python -m venv .venv
    .\.venv\Scripts\activate      # macOS/Linux: source .venv/bin/activate
@@ -18,20 +22,25 @@
    ```
 
 3. **벡터스토어 구축**
+
    ```bash
    python -m backend.rag.vectorstore
    ```
+
    - `.env`의 `RAW_JSON`(glob 가능)에서 코스를 읽어 LangChain `Document`로 변환하고, `VECTORSTORE_DIR` 경로에 Chroma DB를 생성/갱신합니다.
    - 원본 데이터나 임베딩 모델 설정을 바꿨다면 이 명령을 다시 실행하세요.
 
 4. **Streamlit 챗봇 실행**
+
    ```bash
    streamlit run frontend/app.py
    ```
+
    - 터미널에 현재 사용 중인 LLM/임베딩 모델명이 출력되고, 브라우저에서 상담 챗봇 UI가 열립니다.
    - 질문 입력 시 LangGraph 기반 RAG 파이프라인이 동작하여 답변을 생성합니다.
 
 ## 프로젝트 구조
+
 ```
 major-mentor-bot/
 ├─ backend/
@@ -77,7 +86,7 @@ major-mentor-bot/
   - `frontend/app.py`는 Streamlit UI를 제공하며 `backend.main.run_mentor`를 직접 호출해 답변을 보여줍니다.
 
 - **데이터 소스**
-  - https://www.career.go.kr/cnet/front/openapi/openApiMajorCenter.do
+  - <https://www.career.go.kr/cnet/front/openapi/openApiMajorCenter.do>
   - API에서 받아온 과목 정보를 JSON으로 저장 후 `RAW_JSON` 경로에 둡니다.
 
 ## 참고/아이디어 메모
