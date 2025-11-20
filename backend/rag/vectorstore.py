@@ -36,7 +36,6 @@ def build_vectorstore(
         embedding=embeddings,
         persist_directory=str(persist_directory),
     )
-    vs.persist()
     return vs
 
 

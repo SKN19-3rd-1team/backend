@@ -17,7 +17,7 @@ load_dotenv(dotenv_path=env_path)
 class Settings:
     openai_api_key: str = os.getenv('OPENAI_API_KEY', '')
     data_dir: str = os.getenv('DATA_DIR', 'backend/data')
-    raw_json: str = os.getenv('RAW_JSON', 'backend/data/raw/konkuk_all_건국대.json')
+    raw_json: str = os.getenv('RAW_JSON', 'backend/data/merged_university_courses.json')
     vector_store_path: str = os.getenv('VECTORSTORE_PATH', 'backend/data/processed/courses.parquet')
     vectorstore_dir: str = os.getenv('VECTORSTORE_DIR', 'backend/data/chroma_db')
     llm_provider: str = os.getenv('LLM_PROVIDER', 'huggingface')

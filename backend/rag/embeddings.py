@@ -28,8 +28,14 @@ def get_embeddings():
         if hf_token:
             os.environ.setdefault("HUGGINGFACEHUB_API_TOKEN", hf_token)
 
+        # GPU 사용 설정
+        model_kwargs = {"device": "cuda"}      # 또는 "cuda:0"
+        encode_kwargs = {"normalize_embeddings": True}
+
         return HuggingFaceEmbeddings(
             model_name=settings.embedding_model_name,
+            model_kwargs=model_kwargs,
+            encode_kwargs=encode_kwargs
         )
 
     raise ValueError(
