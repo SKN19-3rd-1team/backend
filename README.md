@@ -74,12 +74,103 @@ major-mentor-bot/
 └─ pyproject.toml or environment.yml (선택)
 ```
 
+## 프로젝트 작동 방식
+
+이 프로젝트는 **두 가지 다른 RAG 패턴**을 지원합니다:
+
+### 1. ReAct 패턴 (기본값, Agentic)
+
+**LLM이 자율적으로 tool 호출 여부를 결정하는 에이전트 방식**
+
+```
+[사용자 질문] → agent_node → should_continue
+                    ↑              ↓
+                    └── tools ←────┘
+                         ↓
+                      [답변]
+```
+
+**작동 순서:**
+1. 사용자가 질문 입력 (예: "인공지능 관련 과목 추천해줘")
+2. `agent_node`: LLM이 질문을 분석하고 "과목 정보가 필요하다"고 판단
+3. LLM이 `retrieve_courses` tool 호출 결정 (tool_calls 포함하여 응답)
+4. `should_continue`: tool_calls 감지 → tools 노드로 라우팅
+5. `tools` 노드: `retrieve_courses` 함수 실행 → 벡터 DB에서 과목 검색
+6. `agent_node`로 복귀: LLM이 검색 결과 보고 최종 답변 생성
+7. `should_continue`: tool_calls 없음 → 종료
+
+**핵심 파일:**
+- `backend/rag/tools.py`: `@tool` 데코레이터로 정의된 LangChain tool
+- `backend/graph/nodes.py`: `agent_node`, `should_continue`
+- `backend/graph/graph_builder.py`: `build_react_graph()`
+
+**장점:**
+- LLM이 필요시에만 tool 호출 (효율적)
+- 여러 번 tool 호출 가능 (복잡한 질문 처리)
+- 진정한 Agentic 동작
+
+### 2. Structured 패턴 (고정 파이프라인)
+
+**미리 정해진 순서대로 실행되는 파이프라인 방식**
+
+```
+[사용자 질문] → retrieve_node → select_node → answer_node → [답변]
+```
+
+**작동 순서:**
+1. `retrieve_node`: 벡터 DB에서 관련 과목 5개 검색
+2. `select_node`: LLM이 JSON 형식으로 적합한 과목 2-3개 선택
+3. `answer_node`: 선택된 과목만 사용하여 최종 답변 생성
+
+**핵심 파일:**
+- `backend/graph/nodes.py`: `retrieve_node`, `select_node`, `answer_node`
+- `backend/graph/graph_builder.py`: `build_structured_graph()`
+
+**장점:**
+- Hallucination 방지 (선택된 과목만 LLM에게 제공)
+- 명확한 실행 순서 (디버깅 용이)
+- 예측 가능한 동작
+
+### 패턴 비교표
+
+| | **ReAct** | **Structured** |
+|---|---|---|
+| **Agentic** | ✅ 예 (LLM이 tool 호출 결정) | ❌ 아니오 (고정 순서) |
+| **실행 방식** | agent ⇄ tools (반복 가능) | retrieve → select → answer |
+| **tool 호출** | LLM이 자율 결정 | 무조건 실행 |
+| **유연성** | 높음 (복잡한 질문 처리) | 낮음 (단순 파이프라인) |
+| **Hallucination** | 가능성 있음 | 낮음 (선택된 과목만 제공) |
+| **현재 사용** | ✅ 기본값 | 옵션 |
+
+### 모드 변경 방법
+
+`backend/main.py`의 `run_mentor()` 함수에서 `mode` 파라미터로 변경:
+
+```python
+# ReAct 모드 (기본)
+answer = run_mentor("인공지능 과목 추천해줘")
+
+# Structured 모드
+answer = run_mentor("인공지능 과목 추천해줘", mode="structured")
+```
+
+또는 `frontend/app.py`에서 직접 변경:
+
+```python
+response = run_mentor(
+    question=prompt,
+    interests=st.session_state.interests or None,
+    mode="structured"  # ← 여기를 변경
+)
+```
+
 ## 구성 설명
 
 - **backend**
   - LangGraph + LangChain RAG 파이프라인 전체를 담당합니다.
   - `config.py`는 모든 경로 및 모델 설정을 중앙에서 관리하며, `.env` 기반으로 LLM/임베딩을 선택합니다.
   - `rag/loader.py`는 JSON 데이터를 LangChain `Document`로 변환하고, `rag/vectorstore.py`는 Chroma 벡터스토어를 생성·로드합니다.
+  - `rag/tools.py`는 `@tool` 데코레이터로 LLM이 호출할 수 있는 tool을 정의합니다.
   - `graph/` 폴더에는 RAG 파이프라인을 LangGraph로 정의한 노드, 상태, 그래프 빌더가 들어 있습니다.
 
 - **frontend**
