@@ -1,4 +1,12 @@
 # backend/graph/nodes.py
+"""
+LangGraph 그래프를 구성하는 노드 함수들을 정의합니다.
+
+이 파일에는 두 가지 패턴이 공존합니다:
+1. **ReAct 패턴**: LLM이 자율적으로 tool 호출 여부를 결정 (agent_node, should_continue)
+2. **Structured 패턴**: 미리 정해진 순서대로 실행되는 파이프라인 (retrieve_node, select_node, answer_node)
+"""
+
 from typing import List
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -13,15 +21,20 @@ from backend.rag.tools import retrieve_courses
 
 from backend.config import get_llm
 
+# LLM 인스턴스 생성 (.env에서 설정한 LLM_PROVIDER와 MODEL_NAME 사용)
 llm = get_llm()
 
-# ReAct 에이전트용 LLM (툴 바인딩)
-tools = [retrieve_courses]
-llm_with_tools = llm.bind_tools(tools)
+# ==================== ReAct 에이전트용 설정 ====================
+# ReAct 패턴: LLM이 필요시 자율적으로 툴을 호출할 수 있도록 설정
+tools = [retrieve_courses]  # 사용 가능한 툴 목록
+llm_with_tools = llm.bind_tools(tools)  # LLM에 툴 사용 권한 부여
 
-# Structured Output을 위한 Pydantic 모델
+# ==================== Structured 패턴용 Pydantic 모델 ====================
 class CourseSelection(BaseModel):
-    """학생 질문에 적합한 과목 ID를 선택하는 구조화된 출력"""
+    """
+    Structured Output 패턴에서 사용하는 과목 선택 모델.
+    LLM이 JSON 형식으로 선택한 과목 ID와 이유를 반환합니다.
+    """
     selected_ids: List[str] = Field(
         description="후보 과목 리스트에서 학생에게 추천할 과목의 ID 리스트 (예: ['course_0', 'course_2'])"
     )
@@ -29,9 +42,23 @@ class CourseSelection(BaseModel):
         description="해당 과목들을 선택한 간단한 이유"
     )
 
+
+# ==================== Structured 패턴 노드들 ====================
+# 이 노드들은 미리 정해진 순서대로 실행됩니다: retrieve → select → answer
+# LLM이 노드 실행 여부를 선택하지 않습니다.
+
 def retrieve_node(state: MentorState) -> dict:
+    """
+    [Structured 패턴 - 1단계] 벡터 DB에서 관련 과목 후보를 검색합니다.
+
+    작동 방식:
+    1. 학생의 질문에서 필터 조건 추출 (대학, 학년, 학기 등)
+    2. 벡터 DB에서 유사도 기반 검색 수행
+    3. 검색된 문서들을 course_candidates 형태로 변환하여 상태에 저장
+    """
     question = state["question"]
 
+    # 1. 질문에서 메타데이터 필터 추출 (예: "서울대 1학년" → university, grade)
     extracted_filters = extract_filters(question)
 
     if not extracted_filters:
@@ -39,15 +66,15 @@ def retrieve_node(state: MentorState) -> dict:
     else:
         chroma_filter = build_chroma_filter(extracted_filters)
 
-
-
-    search_k = 5  # Retrieved candidates per question
+    # 2. 벡터 DB에서 유사도 검색 수행
+    search_k = 5  # 검색할 과목 후보 개수
     docs: List[Document] = retrieve_with_filter(
         question=question,
         search_k=search_k,
         metadata_filter=chroma_filter
     )
 
+    # 3. 필터가 너무 제한적이어서 결과가 없으면, 필터 없이 재검색
     filter_applied = chroma_filter is not None
     filter_relaxed = False
     if filter_applied and not docs:
@@ -62,11 +89,11 @@ def retrieve_node(state: MentorState) -> dict:
         )
         filter_relaxed = True
 
-    # retrieve_node에서 얻은 문서를 그대로 상태에 보관
+    # 4. 검색된 Document를 구조화된 course_candidates로 변환
     course_candidates = []
     for idx, doc in enumerate(docs):
         meta = doc.metadata
-        course_id = f"course_{idx}"  # 조회 순번 기반 ID
+        course_id = f"course_{idx}"  # 순번 기반 임시 ID 부여
 
         candidate = {
             "id": course_id,
@@ -80,27 +107,35 @@ def retrieve_node(state: MentorState) -> dict:
         }
         course_candidates.append(candidate)
 
+    # 5. 검색 결과를 상태(state)에 반환 → 다음 노드(select_node)로 전달됨
     return {
-        "retrieved_docs": docs,  # 검색된 LangChain 문서
-        "course_candidates": course_candidates,
-        "metadata_filter_applied": filter_applied,
-        "metadata_filter_relaxed": filter_relaxed,
+        "retrieved_docs": docs,  # 원본 LangChain 문서
+        "course_candidates": course_candidates,  # 구조화된 과목 후보
+        "metadata_filter_applied": filter_applied,  # 필터 적용 여부
+        "metadata_filter_relaxed": filter_relaxed,  # 필터 완화 여부
     }
 
 
 def answer_node(state: MentorState) -> dict:
     """
-    selected_course_ids를 기반으로 선택된 과목들만 사용하여 최종 답변 생성.
-    LLM은 이미 선택된 과목 정보만 받으므로, 존재하지 않는 과목을 만들어낼 여지가 없음.
+    [Structured 패턴 - 3단계] 선택된 과목들만 사용하여 최종 답변 생성.
+
+    작동 방식:
+    1. select_node에서 선택한 과목 ID들을 가져옴
+    2. 해당 과목들의 상세 정보만 LLM에게 제공
+    3. LLM이 제공된 과목들만 사용하여 학생에게 답변 생성
+
+    ** 중요: LLM은 이미 선택된 과목 정보만 받으므로, 존재하지 않는 과목을 만들어낼 수 없음 **
     """
     question = state["question"]
-    selected_ids = state.get("selected_course_ids", [])
-    candidates = state.get("course_candidates", [])
+    selected_ids = state.get("selected_course_ids", [])  # select_node에서 선택한 ID들
+    candidates = state.get("course_candidates", [])  # retrieve_node에서 검색한 전체 후보
 
+    # 1. 선택된 과목이 없으면 에러 메시지 반환
     if not selected_ids:
         return {"answer": "죄송합니다. 질문에 맞는 적절한 과목을 찾지 못했습니다. 다른 질문을 해주시겠어요?"}
 
-    # selected_ids에 해당하는 과목만 필터링
+    # 2. selected_ids에 해당하는 과목만 필터링
     id_to_candidate = {c["id"]: c for c in candidates}
     selected_courses = [
         id_to_candidate[course_id]
@@ -111,7 +146,7 @@ def answer_node(state: MentorState) -> dict:
     if not selected_courses:
         return {"answer": "죄송합니다. 선택된 과목 정보를 찾을 수 없습니다."}
 
-    # 선택된 과목 정보를 텍스트로 포맷
+    # 3. 선택된 과목 정보를 텍스트로 포맷 (LLM이 읽기 쉽게)
     lines = []
     for i, course in enumerate(selected_courses, start=1):
         lines.append(
@@ -122,6 +157,7 @@ def answer_node(state: MentorState) -> dict:
         )
     context = "\n\n".join(lines)
 
+    # 4. LLM에게 명확한 지침을 주는 시스템 프롬프트 작성
     system_prompt = (
         "당신은 대학 전공 탐색 멘토입니다.\n"
         "학생의 질문에 대해 아래에 제공된 과목들을 바탕으로 친절하고 구체적으로 설명해 주세요.\n\n"
@@ -136,6 +172,7 @@ def answer_node(state: MentorState) -> dict:
         "5. 같은 과목을 중복해서 언급하지 마세요."
     )
 
+    # 5. 사용자 프롬프트 작성 (질문 + 선택된 과목 정보)
     user_prompt = (
         f"학생 질문: {question}\n\n"
         "아래는 학생에게 추천된 과목 정보입니다.\n"
@@ -143,6 +180,7 @@ def answer_node(state: MentorState) -> dict:
         f"선택된 과목 정보:\n{context}"
     )
 
+    # 6. LLM 호출하여 최종 답변 생성
     response = llm.invoke(
         [
             {"role": "system", "content": system_prompt},
@@ -150,22 +188,30 @@ def answer_node(state: MentorState) -> dict:
         ]
     )
 
+    # 7. 생성된 답변을 상태에 반환 (그래프 종료)
     return {"answer": response.content}
 
 
 def select_node(state: MentorState) -> dict:
     """
-    course_candidates 중에서 학생 질문에 적합한 과목의 ID만 선택.
-    JSON 형식으로 course_id 리스트만 반환하도록 프롬프트 강제.
+    [Structured 패턴 - 2단계] 검색된 과목 후보 중에서 질문에 적합한 과목들만 선택.
+
+    작동 방식:
+    1. retrieve_node에서 검색한 course_candidates를 받음 (예: 5개)
+    2. LLM에게 각 과목의 정보를 제공하고, 질문에 맞는 과목의 ID만 선택하도록 요청
+    3. LLM이 JSON 형식으로 선택한 과목 ID 리스트 반환
+    4. 선택된 ID들을 검증하여 상태에 저장
+
+    ** 목적: 검색된 5개 중에서 정말 적합한 2-3개만 골라내어 hallucination 방지 **
     """
     question = state["question"]
-    candidates = state.get("course_candidates", [])
+    candidates = state.get("course_candidates", [])  # retrieve_node에서 검색한 후보들
 
+    # 1. 후보가 없으면 빈 리스트 반환
     if not candidates:
-        # 후보가 없으면 빈 리스트 반환
         return {"selected_course_ids": []}
 
-    # 후보 과목 정보를 텍스트로 포맷
+    # 2. 후보 과목 정보를 텍스트로 포맷 (LLM이 읽기 쉽게)
     candidate_lines = []
     for c in candidates:
         candidate_lines.append(
@@ -173,10 +219,11 @@ def select_node(state: MentorState) -> dict:
             f"  과목명: {c['name']}\n"
             f"  대학: {c['university']}, 학과: {c['department']}\n"
             f"  학년/학기: {c['grade_semester']}, 분류: {c['classification']}\n"
-            f"  설명: {c['description'][:100]}..."  # 설명은 100자까지만
+            f"  설명: {c['description'][:100]}..."  # 설명은 100자까지만 (너무 길면 토큰 낭비)
         )
     candidates_text = "\n\n".join(candidate_lines)
 
+    # 3. LLM에게 과목 선택을 위한 시스템 프롬프트 작성
     system_prompt = (
         "당신은 대학 전공 탐색 멘토입니다.\n"
         "아래에 제공된 과목 후보 리스트에서 학생의 질문에 가장 적합한 과목들의 ID를 선택하세요.\n\n"
@@ -190,6 +237,7 @@ def select_node(state: MentorState) -> dict:
         "다른 텍스트 없이 오직 JSON만 출력하세요."
     )
 
+    # 4. 사용자 프롬프트 작성 (질문 + 후보 리스트)
     user_prompt = (
         f"학생 질문: {question}\n\n"
         f"과목 후보 리스트:\n{candidates_text}\n\n"
@@ -197,6 +245,7 @@ def select_node(state: MentorState) -> dict:
     )
 
     try:
+        # 5. LLM 호출하여 과목 선택 수행
         response = llm.invoke(
             [
                 {"role": "system", "content": system_prompt},
@@ -204,13 +253,13 @@ def select_node(state: MentorState) -> dict:
             ]
         )
 
-        # JSON 파싱
+        # 6. JSON 파싱
         import json
         import re
 
         response_text = response.content.strip()
 
-        # JSON 블록 추출 (```json ... ``` 같은 마크다운 코드블록 처리)
+        # 7. JSON 블록 추출 (```json ... ``` 같은 마크다운 코드블록 처리)
         json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
         if json_match:
             json_text = json_match.group(1)
@@ -221,32 +270,47 @@ def select_node(state: MentorState) -> dict:
         selection_data = json.loads(json_text)
         selected_ids = selection_data.get("selected_ids", [])
 
-        # 선택된 ID가 실제 후보 리스트에 있는지 검증
+        # 8. 선택된 ID가 실제 후보 리스트에 있는지 검증 (보안)
         valid_ids = {c["id"] for c in candidates}
         filtered_ids = [
             course_id for course_id in selected_ids
             if course_id in valid_ids
         ]
 
+        # 9. 검증된 ID 리스트를 상태에 반환 → answer_node로 전달됨
         return {"selected_course_ids": filtered_ids}
 
     except Exception as e:
-        # JSON 파싱 실패 시 폴백: 모든 후보 반환
+        # 10. JSON 파싱 실패 시 폴백: 상위 3개 후보를 기본으로 반환
         print(f"Warning: select_node JSON parsing failed: {e}")
         print(f"Response was: {response.content[:200] if 'response' in locals() else 'N/A'}")
         return {"selected_course_ids": [c["id"] for c in candidates[:3]]}
 
 
 # ==================== ReAct 스타일 에이전트 노드 ====================
+# 이 노드들은 LLM이 자율적으로 tool 호출 여부를 결정합니다.
+# LLM이 "지금 과목 검색이 필요한가?"를 판단하여 retrieve_courses를 호출합니다.
 
 def agent_node(state: MentorState) -> dict:
     """
-    ReAct 스타일 에이전트 노드.
-    LLM이 필요에 따라 retrieve_courses 툴을 호출하여 과목 정보를 가져옵니다.
+    [ReAct 패턴 - 핵심 노드] LLM이 자율적으로 tool 사용 여부를 결정합니다.
+
+    ** ReAct 작동 방식 **
+    1. LLM이 학생의 질문을 분석
+    2. "과목 정보가 필요하다"고 판단하면 retrieve_courses 툴 호출 결정
+    3. LLM이 tool_calls를 response에 포함하여 반환
+    4. should_continue가 tool_calls를 감지하면 tools 노드로 라우팅
+    5. tools 노드에서 실제 툴 실행 (retrieve_courses 함수 호출)
+    6. 툴 결과를 다시 agent_node로 전달
+    7. LLM이 툴 결과를 보고 최종 답변 생성
+
+    ** Structured 패턴과의 차이 **
+    - Structured: retrieve → select → answer (고정된 순서)
+    - ReAct: agent가 필요시에만 tool 호출 (자율적 결정)
     """
     messages = state.get("messages", [])
 
-    # 첫 호출인 경우 시스템 프롬프트 추가
+    # 1. 첫 호출인 경우 시스템 프롬프트 추가 (tool 사용 지침 포함)
     if not messages or not any(isinstance(m, SystemMessage) for m in messages):
         system_message = SystemMessage(content=(
             "당신은 대학 전공 탐색 멘토입니다.\n"
@@ -260,22 +324,41 @@ def agent_node(state: MentorState) -> dict:
         ))
         messages = [system_message] + messages
 
-    # LLM 호출
+    # 2. LLM 호출 (llm_with_tools는 retrieve_courses 툴이 바인딩된 LLM)
+    #    LLM이 자율적으로 tool 호출 여부를 결정합니다.
+    #    - tool이 필요하면: response에 tool_calls 포함
+    #    - tool이 필요없으면: response에 일반 텍스트만 포함
     response = llm_with_tools.invoke(messages)
 
+    # 3. LLM의 응답(response)을 messages에 추가하여 상태 업데이트
+    #    → should_continue가 tool_calls 유무를 확인하여 다음 노드 결정
     return {"messages": [response]}
 
 
 def should_continue(state: MentorState) -> str:
     """
-    에이전트가 계속 실행할지, 종료할지 결정하는 조건부 엣지.
+    [ReAct 패턴 - 라우팅 함수] 다음 노드를 결정하는 조건부 엣지.
+
+    ** 작동 방식 **
+    1. agent_node의 응답(last_message)을 확인
+    2. tool_calls가 있으면 → "tools" 반환 → tools 노드로 이동
+    3. tool_calls가 없으면 → "end" 반환 → 그래프 종료
+
+    ** 예시 플로우 **
+    - 학생: "인공지능 관련 과목 추천해줘"
+    - agent_node: tool_calls=[retrieve_courses("인공지능")] → should_continue → "tools"
+    - tools 노드: retrieve_courses 실행 → 결과 반환
+    - agent_node: 결과 보고 답변 생성 → tool_calls=[] → should_continue → "end"
+
+    이렇게 LLM이 tool 호출 여부를 자율적으로 제어합니다.
     """
     messages = state.get("messages", [])
     last_message = messages[-1] if messages else None
 
-    # 마지막 메시지가 툴 호출을 포함하면 tools 노드로
+    # 마지막 메시지에서 tool_calls 확인
+    # tool_calls가 있으면: LLM이 툴 사용을 원함 → tools 노드로 라우팅
     if last_message and hasattr(last_message, "tool_calls") and last_message.tool_calls:
         return "tools"
 
-    # 그렇지 않으면 종료
+    # tool_calls가 없으면: LLM이 최종 답변 완료 → 그래프 종료
     return "end"
