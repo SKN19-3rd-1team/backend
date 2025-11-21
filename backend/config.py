@@ -45,7 +45,18 @@ def get_llm():
     if provider == "openai":
         # OPENAI_API_KEY는 env 에서 자동으로 읽음
         from langchain_openai import ChatOpenAI
-        return ChatOpenAI(model=settings.model_name)
+
+        # OPENAI_API_BASE 지원 (vLLM, Together AI, Anyscale 등 OpenAI 호환 서버용)
+        base_url = os.getenv("OPENAI_API_BASE", None)
+
+        if base_url:
+            return ChatOpenAI(
+                model=settings.model_name,
+                base_url=base_url,  # OpenAI 호환 API 서버 주소
+                api_key=settings.openai_api_key
+            )
+        else:
+            return ChatOpenAI(model=settings.model_name)
 
     elif provider == "ollama":
         # 예: MODEL_NAME=llama3.2:1b, qwen2.5:7b-instruct 등
