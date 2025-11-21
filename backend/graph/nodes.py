@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from .state import MentorState
 from backend.rag.retriever import retrieve_with_filter
 from backend.rag.entity_extractor import extract_filters, build_chroma_filter
-from backend.rag.tools import retrieve_courses
+from backend.rag.tools import retrieve_courses, list_departments, recommend_curriculum
 
 from backend.config import get_llm
 
@@ -26,7 +26,7 @@ llm = get_llm()
 
 # ==================== ReAct 에이전트용 설정 ====================
 # ReAct 패턴: LLM이 필요시 자율적으로 툴을 호출할 수 있도록 설정
-tools = [retrieve_courses]  # 사용 가능한 툴 목록
+tools = [retrieve_courses, list_departments, recommend_curriculum]  # 사용 가능한 툴 목록
 llm_with_tools = llm.bind_tools(tools)  # LLM에 툴 사용 권한 부여
 
 # ==================== Structured 패턴용 Pydantic 모델 ====================
@@ -309,18 +309,32 @@ def agent_node(state: MentorState) -> dict:
     - ReAct: agent가 필요시에만 tool 호출 (자율적 결정)
     """
     messages = state.get("messages", [])
+    interests = state.get("interests")
 
     # 1. 첫 호출인 경우 시스템 프롬프트 추가 (tool 사용 지침 포함)
     if not messages or not any(isinstance(m, SystemMessage) for m in messages):
+        # Interests 정보 포함
+        interests_info = ""
+        if interests:
+            interests_info = f"\n\n**학생의 관심사**: {interests}\n"
+
         system_message = SystemMessage(content=(
             "당신은 대학 전공 탐색 멘토입니다.\n"
-            "학생들의 질문에 답변할 때는 반드시 'retrieve_courses' 툴을 사용하여 "
-            "과목 데이터베이스에서 정보를 검색한 후 답변하세요.\n\n"
+            "학생들의 질문에 **반드시 한국어로** 답변하세요."
+            f"{interests_info}\n"
+            "**사용 가능한 툴:**\n"
+            "1. retrieve_courses: 특정 과목을 검색할 때 사용 (예: '인공지능 과목 추천해줘')\n"
+            "2. list_departments: 학과 목록을 조회할 때 사용 (예: '컴퓨터 관련 학과가 뭐가 있어?')\n"
+            "3. recommend_curriculum: 학기별 커리큘럼을 추천할 때 사용 (예: '2학년부터 4학년까지 커리큘럼 추천해줘')\n\n"
             "**중요 지침:**\n"
-            "1. 학생이 과목 추천을 요청하면, 먼저 retrieve_courses 툴로 관련 과목을 검색하세요.\n"
-            "2. 검색된 과목 정보만 사용하여 답변하세요. 절대로 존재하지 않는 과목을 만들어내지 마세요.\n"
-            "3. 각 과목의 특징, 내용, 학생에게 도움이 되는 점을 친절하게 설명하세요.\n"
-            "4. 너무 어려운 용어는 풀어서 설명하고, 현실적인 진로 예시도 들어주세요."
+            "1. 학생이 '학과가 뭐가 있어?', '어떤 학과 있어?', '전공 종류' 같은 질문을 하면 list_departments 툴을 사용하세요.\n"
+            "2. 학생이 특정 과목 추천을 요청하면, retrieve_courses 툴로 관련 과목을 검색하세요.\n"
+            "3. 학생이 '2학년부터 4학년까지', '전체 커리큘럼', '학기별로' 같은 표현을 사용하면 recommend_curriculum 툴을 사용하세요.\n"
+            f"4. recommend_curriculum 툴 호출 시, interests 파라미터에 '{interests}'를 반드시 전달하세요.\n"
+            "5. 검색된 정보만 사용하여 답변하세요. 절대로 존재하지 않는 과목이나 학과를 만들어내지 마세요.\n"
+            "6. 각 과목/학과의 특징, 내용, 학생에게 도움이 되는 점을 친절하게 **한국어로** 설명하세요.\n"
+            "7. 너무 어려운 용어는 풀어서 설명하고, 현실적인 진로 예시도 들어주세요.\n"
+            "8. **답변은 항상 한국어로 작성하세요. 절대로 다른 언어를 사용하지 마세요.**"
         ))
         messages = [system_message] + messages
 
