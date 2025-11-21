@@ -16,8 +16,7 @@
 2. **가상환경 및 의존성 설치 (최초 1회)**
 
    ```bash
-   python -m venv .venv
-   .\.venv\Scripts\activate      # macOS/Linux: source .venv/bin/activate
+   conda create -n {가상환경명} python=3.11
    pip install -r requirements.txt
    ```
 
