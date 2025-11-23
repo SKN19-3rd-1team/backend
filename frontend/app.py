@@ -115,6 +115,9 @@ if prompt:
     # Add user message to chat history if not already added by format flow
     if not st.session_state.format_pending:
         st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+            
         display_content = prompt
     else:
         # We're resuming after a format selection; show the original user message
