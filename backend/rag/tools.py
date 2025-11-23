@@ -16,9 +16,33 @@ from .vectorstore import load_vectorstore
 from .embeddings import get_embeddings
 
 
+def _get_tool_usage_guide() -> str:
+    """
+    사용자에게 제공할 툴 사용 가이드 메시지를 생성합니다.
+    """
+    return """
+검색 가능한 방법들:
+
+1. **특정 과목 검색**
+   - 예시: "인공지능 관련 과목 추천해줘", "1학년 필수 과목 알려줘"
+   - 검색어에 과목명, 학년, 학기, 대학명 등을 포함할 수 있습니다
+
+2. **학과 목록 조회**
+   - 예시: "어떤 학과들이 있어?", "컴퓨터 관련 학과 알려줘", "공대에는 어떤 학과가 있어?"
+   - 전체 학과 목록 또는 키워드로 필터링된 학과를 확인할 수 있습니다
+
+3. **커리큘럼 추천**
+   - 예시: "홍익대 컴퓨터공학과 2학년부터 4학년까지 커리큘럼 추천해줘"
+   - 예시: "인공지능에 관심있는데 전체 커리큘럼 알려줘"
+   - 학기별로 맞춤 과목을 추천받을 수 있습니다
+
+더 구체적인 질문을 해주시면 더 정확한 정보를 제공해드릴 수 있습니다!
+"""
+
+
 @tool
 def retrieve_courses(
-    query: str,
+    query: Optional[str] = None,
     university: Optional[str] = None,
     college: Optional[str] = None,
     department: Optional[str] = None,
@@ -30,10 +54,21 @@ def retrieve_courses(
     대학 과목 데이터베이스에서 관련 과목을 검색합니다.
 
     ** 중요: 이 함수는 LLM이 자율적으로 호출할 수 있는 Tool입니다 **
-    LLM은 학생의 질문을 분석한 후, 필요하다고 판단되면 이 툴을 호출합니다.
+    ** 학생이 특정 대학, 학과, 과목에 대해 질문하면 반드시 이 툴을 먼저 호출해야 합니다! **
+
+    ** 필수 사용 상황 **
+    - 학생이 특정 대학/학과를 언급할 때 (예: "홍익대학교 컴퓨터공학", "서울대 전자공학과")
+    - 학생이 과목 추천을 요청할 때 (예: "인공지능 과목 추천해줘", "1학년 필수 과목")
+    - 학생이 특정 분야 과목을 물어볼 때 (예: "데이터분석 과목", "네트워크 관련 수업")
+
+    ** 호출 방법 **
+    1. query만 사용: retrieve_courses(query="홍익대학교 컴퓨터공학")
+    2. 파라미터만 사용: retrieve_courses(university="홍익대학교", department="컴퓨터공학")
+    3. 혼합 사용: retrieve_courses(query="인공지능", university="홍익대학교")
 
     Args:
-        query: 검색 쿼리 (예: "인공지능 관련 과목", "1학년 필수 과목")
+        query: 검색 쿼리 (옵션, 예: "인공지능 관련 과목", "1학년 필수 과목")
+               query가 없으면 다른 파라미터들로 자동 생성됩니다.
         university: 대학교 이름 (옵션, 예: "서울대학교", "홍익대학교")
         college: 단과대학 이름 (옵션, 예: "공과대학", "자연과학대학")
         department: 학과 이름 (옵션, 예: "컴퓨터공학", "전자공학")
@@ -44,10 +79,37 @@ def retrieve_courses(
     Returns:
         과목 리스트 [{"id": "...", "name": "...", "university": "...", ...}, ...]
     """
-    print("Using retreive_courses tools.")
+    # query가 없으면 다른 파라미터들로부터 자동 생성
+    auto_generated = False
+    if not query:
+        query_parts = []
+        if university:
+            query_parts.append(university)
+        if college:
+            query_parts.append(college)
+        if department:
+            query_parts.append(department)
+        if grade:
+            query_parts.append(grade)
+        if semester:
+            query_parts.append(semester)
+
+        if query_parts:
+            query = " ".join(query_parts)
+            auto_generated = True
+        else:
+            # 아무 파라미터도 없으면 기본 쿼리
+            query = "추천 과목"
+            auto_generated = True
+
+    if auto_generated:
+        print(f"✅ Using retrieve_courses tool (auto-generated query: '{query}')")
+        print(f"   Params: university={university}, college={college}, department={department}, grade={grade}, semester={semester}")
+    else:
+        print(f"✅ Using retrieve_courses tool with query: '{query}'")
     # 1. 쿼리에서 필터 자동 추출 (예: "서울대 컴퓨터공학과 1학년" → university, department, grade)
     extracted = extract_filters(query)
-    print(extracted)
+    print(f"   Extracted filters: {extracted}")
 
     # 2. 파라미터로 받은 필터와 추출한 필터 병합 (파라미터가 우선)
     filters = extracted.copy() if extracted else {}
@@ -72,7 +134,16 @@ def retrieve_courses(
         metadata_filter=chroma_filter
     )
 
-    # 5. LangChain Document를 LLM이 이해하기 쉬운 Dict 형태로 변환
+    # 5. 검색 결과가 없을 때 예외처리
+    if not docs:
+        print(f"⚠️  WARNING: No courses found for query='{query}', filters={chroma_filter}")
+        return [{
+            "error": "no_results",
+            "message": "사용자 질문에 대한 정보를 가져올 수 없었습니다.",
+            "suggestion": "get_search_help 툴을 사용하여 검색 가능한 방법을 안내하세요."
+        }]
+
+    # 6. LangChain Document를 LLM이 이해하기 쉬운 Dict 형태로 변환
     results = []
     for idx, doc in enumerate(docs):
         meta = doc.metadata
@@ -86,7 +157,10 @@ def retrieve_courses(
             "classification": meta.get("course_classification", "[정보 없음]"),
             "description": doc.page_content or "[설명 정보가 제공되지 않았습니다]"
         })
-    print(results)
+
+    print(f"✅ Found {len(results)} courses")
+    for r in results[:3]:  # 처음 3개만 출력
+        print(f"   - {r['name']} ({r['university']} {r['department']})")
 
     return results
 
@@ -108,7 +182,7 @@ def get_course_detail(course_id: str, courses_context: List[Dict[str, Any]]) -> 
     Returns:
         과목 상세 정보 {"id": "...", "name": "...", "description": "...", ...}
     """
-    print("Using get_course_detail tools.")
+    print(f"✅ Using get_course_detail tool for course_id: {course_id}")
     # 주어진 course_id와 일치하는 과목을 courses_context에서 찾아 반환
     for course in courses_context:
         if course.get("id") == course_id:
@@ -124,16 +198,20 @@ def get_course_detail(course_id: str, courses_context: List[Dict[str, Any]]) -> 
 @tool
 def list_departments(query: str) -> List[Dict[str, str]]:
     """
-    Vector DB에 있는 모든 학과 목록을 조회합니다.
-    학생이 "어떤 학과가 있어?", "컴퓨터 관련 학과 알려줘" 같은 질문을 할 때 사용하세요.
+    Vector DB에 있는 학과 목록을 조회합니다.
 
-    ** 중요: 이 함수는 LLM이 자율적으로 호출할 수 있는 Tool입니다 **
-    학생이 학과 목록, 학과 종류, 전공 리스트를 물어보면 이 툴을 호출하세요.
+    ** 중요: 이 툴은 학과 **목록 조회**에만 사용하세요! **
+    ** ⚠️ 특정 대학/학과의 과목 정보가 필요하면 retrieve_courses를 사용하세요! **
 
-    ** 사용 시나리오 **
-    1. "어떤 학과들이 있어?" -> query="전체" 로 호출
-    2. "컴퓨터 관련 학과 알려줘" -> query="컴퓨터" 로 호출
-    3. "공대에는 어떤 학과가 있어?" -> query="공학" 로 호출
+    ** 올바른 사용 시나리오 (목록 조회) **
+    ✅ "어떤 학과들이 있어?" -> query="전체" 로 호출
+    ✅ "컴퓨터 관련 학과 목록 알려줘" -> query="컴퓨터" 로 호출
+    ✅ "공대에는 어떤 학과가 있어?" -> query="공학" 로 호출
+
+    ** 잘못된 사용 시나리오 (과목 정보 필요) **
+    ❌ "홍익대학교 컴퓨터공학" -> retrieve_courses를 사용해야 함
+    ❌ "서울대 전자공학과" -> retrieve_courses를 사용해야 함
+    ❌ "컴퓨터공학 과목 추천해줘" -> retrieve_courses를 사용해야 함
 
     Args:
         query: 검색할 키워드 (예: "컴퓨터", "공학", "전체", "전자")
@@ -146,7 +224,7 @@ def list_departments(query: str) -> List[Dict[str, str]]:
             ...
         ]
     """
-    print(f"Using list_departments tool with query: {query}")
+    print(f"✅ Using list_departments tool with query: '{query}'")
 
     vs = load_vectorstore()
     collection = vs._collection
@@ -188,7 +266,17 @@ def list_departments(query: str) -> List[Dict[str, str]]:
                 query_lower in dept_info['department'].lower())
         ]
 
-    print(f"Found {len(result)} departments matching '{query}'")
+    print(f"✅ Found {len(result)} departments matching '{query}'")
+
+    # 검색 결과가 없을 때 예외처리
+    if not result:
+        print(f"⚠️  WARNING: No departments found matching '{query}'")
+        return [{
+            "error": "no_results",
+            "message": "사용자 질문에 대한 정보를 가져올 수 없었습니다.",
+            "suggestion": "get_search_help 툴을 사용하여 검색 가능한 방법을 안내하세요."
+        }]
+
     return result
 
 
@@ -233,7 +321,7 @@ def recommend_curriculum(
             ...
         ]
     """
-    print(f"Using recommend_curriculum tool: {university} {department}, interests='{interests}'")
+    print(f"✅ Using recommend_curriculum tool: {university} {department}, interests='{interests}'")
 
     vs = load_vectorstore()
     embeddings = get_embeddings()
@@ -244,6 +332,7 @@ def recommend_curriculum(
         interests_embedding = embeddings.embed_query(interests)
 
     curriculum = []
+    selected_course_names = set()  # 중복 과목 방지용
 
     # 학기별로 반복
     for grade in range(start_grade, end_grade + 1):
@@ -265,13 +354,15 @@ def recommend_curriculum(
             }
 
             chroma_filter = build_chroma_filter(filter_dict)
+            print(f"   [{semester_label}] Searching with filter: {filter_dict}")
 
             try:
                 # 해당 학기 과목 검색
                 docs = retrieve_with_filter(
                     question=interests if interests else "추천 과목",
                     search_k=10,  # 후보 많이 가져오기
-                    metadata_filter=chroma_filter
+                    metadata_filter=chroma_filter,
+                    warn_on_fallback=True  # Fallback 경고 활성화
                 )
 
                 if not docs:
@@ -282,34 +373,54 @@ def recommend_curriculum(
                     })
                     continue
 
+                # 이미 선택된 과목 제외
+                available_docs = [
+                    doc for doc in docs
+                    if doc.metadata.get("name", "") not in selected_course_names
+                ]
+
+                if not available_docs:
+                    print(f"   ⚠️  [{semester_label}] 모든 과목이 이미 선택됨")
+                    curriculum.append({
+                        "semester": semester_label,
+                        "course": None,
+                        "reason": "해당 학기의 과목이 이미 다른 학기에 선택되었습니다."
+                    })
+                    continue
+
                 # 관심사가 있으면 유사도 기반으로 정렬
-                if interests_embedding:
-                    doc_scores = []
-                    for doc in docs:
-                        # 과목 설명 임베딩
-                        desc = doc.page_content
-                        doc_embedding = embeddings.embed_query(desc)
+                if interests_embedding and interests:
+                    # 성능 개선: Vector Store의 유사도 검색 활용
+                    # 이미 검색된 docs는 유사도 순으로 정렬되어 있음
+                    # 관심사로 한 번 더 검색하는 대신, 검색 결과 순서 활용
+                    print(f"   [Optimization] Using vector store similarity scores (skipping re-embedding)")
 
-                        # 코사인 유사도 계산
-                        similarity = np.dot(interests_embedding, doc_embedding) / (
-                            np.linalg.norm(interests_embedding) * np.linalg.norm(doc_embedding)
-                        )
-                        doc_scores.append((doc, similarity))
-
-                    # 유사도 높은 순으로 정렬
-                    doc_scores.sort(key=lambda x: x[1], reverse=True)
-                    best_doc, score = doc_scores[0]
-                    reason = f"'{interests}' 관심사와 유사도 {score:.2f}"
+                    # available_docs는 이미 similarity_search로 정렬된 상태
+                    # 관심사와 가장 유사한 과목이 앞에 있을 가능성이 높음
+                    best_doc = available_docs[0]
+                    reason = f"'{interests}' 관심사 관련 과목 (검색 결과 기준)"
                 else:
                     # 관심사 없으면 첫 번째 과목 선택
-                    best_doc = docs[0]
+                    best_doc = available_docs[0]
                     reason = "해당 학기 대표 과목"
 
                 meta = best_doc.metadata
+                course_name = meta.get("name", "[이름 없음]")
+
+                # 선택된 과목 추가
+                selected_course_names.add(course_name)
+
+                # 실제 메타데이터 로깅 (디버깅용)
+                actual_univ = meta.get("university", "[정보 없음]")
+                actual_dept = meta.get("department", "[정보 없음]")
+                actual_grade_sem = meta.get("grade_semester", "[정보 없음]")
+                print(f"   ✅ [{semester_label}] Selected: {course_name}")
+                print(f"      Source: {actual_univ} / {actual_dept} / {actual_grade_sem}")
+
                 curriculum.append({
                     "semester": semester_label,
                     "course": {
-                        "name": meta.get("name", "[이름 없음]"),
+                        "name": course_name,
                         "classification": meta.get("course_classification", "[정보 없음]"),
                         "description": best_doc.page_content
                     },
@@ -324,5 +435,35 @@ def recommend_curriculum(
                     "reason": f"검색 중 오류 발생: {str(e)}"
                 })
 
-    print(f"Generated curriculum with {len(curriculum)} semesters")
+    # 커리큘럼 전체가 비어있거나 모든 항목이 오류인 경우 예외처리
+    valid_items = [item for item in curriculum if item.get("course") is not None]
+    if not valid_items:
+        print(f"⚠️  WARNING: No valid curriculum generated for {university} {department}")
+        return [{
+            "error": "no_results",
+            "message": "사용자 질문에 대한 정보를 가져올 수 없었습니다.",
+            "suggestion": "get_search_help 툴을 사용하여 검색 가능한 방법을 안내하세요.",
+            "details": f"대학: {university}, 학과: {department}에 대한 커리큘럼을 찾을 수 없습니다."
+        }]
+
+    print(f"✅ Generated curriculum with {len(curriculum)} semesters ({len(valid_items)} valid)")
+
     return curriculum
+
+
+@tool
+def get_search_help() -> str:
+    """
+    사용자 질문에 대한 정보를 가져올 수 없었을 때 사용하는 툴입니다.
+    검색 가능한 방법들(각 툴을 호출할 수 있는 방법들)을 안내합니다.
+
+    ** 언제 사용하나요? **
+    1. 다른 툴(retrieve_courses, list_departments, recommend_curriculum)의 결과가 비어있을 때
+    2. 사용자의 질문이 너무 모호하거나 데이터베이스에 없는 정보를 요청할 때
+    3. 검색 결과가 없어서 사용자에게 다른 검색 방법을 안내해야 할 때
+
+    Returns:
+        검색 가능한 방법들을 설명하는 가이드 메시지
+    """
+    print("ℹ️  Using get_search_help tool - providing usage guide to user")
+    return _get_tool_usage_guide()

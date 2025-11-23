@@ -60,8 +60,18 @@ def get_llm():
 
     elif provider == "ollama":
         # 예: MODEL_NAME=llama3.2:1b, qwen2.5:7b-instruct 등
-        from langchain_community.chat_models import ChatOllama
-        return ChatOllama(model=settings.model_name)
+        # langchain_ollama 패키지 사용 (langchain_community보다 최신)
+        try:
+            from langchain_ollama import ChatOllama
+        except ImportError:
+            # 폴백: langchain_community 사용
+            from langchain_community.chat_models import ChatOllama
+
+        return ChatOllama(
+            model=settings.model_name,
+            temperature=0.7,  # 창의성 조절 (0.0 = 결정적, 1.0 = 창의적)
+            # base_url="http://localhost:11434",  # 기본값, 필요시 변경 가능
+        )
 
     elif provider == "huggingface":
         # Hugging Face Inference Endpoint / Hub 모델 사용 예시

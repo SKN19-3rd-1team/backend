@@ -98,7 +98,8 @@ def _build_fuzzy_department_filter(
 def retrieve_with_filter(
     question: str,
     search_k: int = 5,
-    metadata_filter: Optional[Dict] = None
+    metadata_filter: Optional[Dict] = None,
+    warn_on_fallback: bool = False
 ) -> List[Document]:
     """
     Retrieve documents with optional metadata filtering and automatic fallback.
@@ -114,6 +115,7 @@ def retrieve_with_filter(
         question: Query string
         search_k: Number of documents to retrieve
         metadata_filter: Chroma-compatible metadata filter
+        warn_on_fallback: If True, print warnings when fallback occurs
 
     Returns:
         List of retrieved documents
@@ -160,6 +162,8 @@ def retrieve_with_filter(
                 filter=fuzzy_filter
             )
             if results:
+                if warn_on_fallback:
+                    print(f"⚠️  [Fallback] Exact filter failed, using fuzzy department matching")
                 print(f"[Retriever] Found {len(results)} results with fuzzy department matching")
                 return results
         except Exception as e:
@@ -175,6 +179,8 @@ def retrieve_with_filter(
                 filter=relaxed_filter
             )
             if results:
+                if warn_on_fallback:
+                    print(f"⚠️  [Fallback] Department filter removed - searching without department constraint")
                 print(f"[Retriever] Found {len(results)} results without department filter")
                 return results
         except Exception as e:
@@ -190,11 +196,16 @@ def retrieve_with_filter(
                 filter=relaxed_filter2
             )
             if results:
+                if warn_on_fallback:
+                    print(f"⚠️  [Fallback] College filter also removed - searching with minimal constraints")
                 print(f"[Retriever] Found {len(results)} results without college filter")
                 return results
         except Exception as e:
             print(f"[Retriever] Relaxed filter (no college) failed: {e}")
 
     # Step 5: Final fallback - pure semantic search
+    if warn_on_fallback:
+        print(f"🚨 [CRITICAL FALLBACK] All filters failed! Using pure semantic search.")
+        print(f"   This may return courses from different universities/departments!")
     print("[Retriever] Falling back to pure semantic search (no filters)")
     return vs.similarity_search(query=question, k=search_k)

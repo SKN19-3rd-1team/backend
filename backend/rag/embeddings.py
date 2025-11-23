@@ -45,8 +45,8 @@ def get_embeddings():
             os.environ.setdefault("HUGGINGFACEHUB_API_TOKEN", hf_token)
 
         # GPU 사용 설정
-        # model_kwargs = {"device": "cuda"}      # 또는 "cuda:0"
-        model_kwargs = {"device": "cpu"}      # 또는 "cpu"
+        model_kwargs = {"device": "cuda"}      # 또는 "cuda:0"
+        # model_kwargs = {"device": "cpu"}      # 또는 "cpu"
         encode_kwargs = {"normalize_embeddings": True}
 
         _EMBEDDINGS_CACHE = HuggingFaceEmbeddings(
