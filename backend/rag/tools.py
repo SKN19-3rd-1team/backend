@@ -1,8 +1,25 @@
 """
-ReAct 스타일 에이전트를 위한 LangChain Tools 정의.
+ReAct 스타일 에이전트를 위한 LangChain Tools 정의
 
 이 파일의 함수들은 @tool 데코레이터를 사용하여 LLM이 호출할 수 있는 툴로 등록됩니다.
-LLM이 자율적으로 이 툴들을 선택하고 실행할 수 있습니다.
+
+** ReAct 패턴에서의 툴 역할 **
+LLM이 사용자 질문을 분석하고, 필요시 자율적으로 이 툴들을 호출하여 정보를 수집합니다.
+예: "홍익대 컴공 과목 알려줘" → LLM이 retrieve_courses 툴 호출 결정 → 과목 정보 검색 → 답변 생성
+
+** 제공되는 툴들 **
+1. retrieve_courses: 과목 검색 (메인 툴, 가장 자주 사용됨)
+2. list_departments: 학과 목록 조회 (목록만 필요할 때)
+3. recommend_curriculum: 학기별 커리큘럼 추천 (여러 학기 계획)
+4. get_search_help: 검색 실패 시 사용 가이드 제공
+5. get_course_detail: 특정 과목 상세 정보 (현재 미사용)
+
+** 작동 방식 **
+1. LLM이 사용자 질문 분석
+2. LLM이 필요한 툴 선택 및 파라미터 결정
+3. 툴 실행 (이 파일의 함수 호출)
+4. 툴 결과를 LLM에게 전달
+5. LLM이 결과를 바탕으로 최종 답변 생성
 """
 
 from typing import List, Dict, Any, Optional
