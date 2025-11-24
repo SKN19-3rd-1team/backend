@@ -38,12 +38,12 @@ class Settings:
     vectorstore_dir: str = os.getenv('VECTORSTORE_DIR', 'backend/data/chroma_db')  # Chroma DB 저장 경로
 
     # LLM 설정
-    llm_provider: str = os.getenv('LLM_PROVIDER', 'huggingface')  # LLM 제공자: openai, ollama, huggingface
-    model_name: str = os.getenv('MODEL_NAME', 'Qwen/Qwen2.5-7B-Instruct')  # 사용할 모델 이름
+    llm_provider: str = os.getenv('LLM_PROVIDER', 'openai')  # LLM 제공자: openai, ollama, huggingface
+    model_name: str = os.getenv('MODEL_NAME', 'gpt-4o-mini')  # 사용할 모델 이름
 
     # 임베딩 설정
-    embedding_model_name: str = os.getenv('EMBEDDING_MODEL_NAME', 'upskyy/bge-m3-korean')  # 임베딩 모델 (한국어 특화)
-    embedding_provider: str = os.getenv('EMBEDDING_PROVIDER', 'huggingface')  # 임베딩 제공자: openai, huggingface
+    embedding_model_name: str = os.getenv('EMBEDDING_MODEL_NAME', 'text-embedding-3-small')  # 임베딩 모델 (한국어 특화)
+    embedding_provider: str = os.getenv('EMBEDDING_PROVIDER', 'openai')  # 임베딩 제공자: openai, huggingface
 
 
 def get_settings() -> Settings:

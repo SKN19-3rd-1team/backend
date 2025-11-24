@@ -79,8 +79,8 @@ def get_embeddings():
 
         # GPU 사용 설정 (로컬 모델 사용 시)
         # GPU가 있으면 임베딩 생성 속도가 크게 향상됨
-        model_kwargs = {"device": "cuda"}      # GPU 사용 (CUDA 설치 필요)
-        # model_kwargs = {"device": "cpu"}      # CPU 사용 (GPU 없을 때)
+        # model_kwargs = {"device": "cuda"}      # GPU 사용 (CUDA 설치 필요)
+        model_kwargs = {"device": "cpu"}      # CPU 사용 (GPU 없을 때)
 
         # 임베딩 정규화 설정
         # normalize_embeddings=True: 벡터를 단위 벡터로 정규화 (코사인 유사도 계산에 유리)

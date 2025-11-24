@@ -67,7 +67,9 @@ def build_react_graph():
 
     # 노드 추가
     graph.add_node("agent", agent_node)  # 핵심 에이전트 노드
-    graph.add_node("tools", ToolNode(tools))  # 툴 실행 노드 (retrieve_courses)
+    # 툴 실행 노드 - LangGraph가 여러 tool call을 병렬 실행하더라도
+    # vectorstore.py의 _VECTORSTORE_LOCK이 동시 접근을 방지함
+    graph.add_node("tools", ToolNode(tools))
 
     # 엣지 설정
     graph.set_entry_point("agent")  # 그래프 시작점

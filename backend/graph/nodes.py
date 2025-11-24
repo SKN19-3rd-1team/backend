@@ -18,7 +18,14 @@ from .state import MentorState
 from backend.rag.retriever import retrieve_with_filter
 from backend.rag.entity_extractor import extract_filters, build_chroma_filter
 
-from backend.rag.tools import retrieve_courses, list_departments, recommend_curriculum, get_search_help, match_department_name
+from backend.rag.tools import (
+    retrieve_courses,
+    list_departments,
+    get_universities_by_department,
+    recommend_curriculum,
+    get_search_help,
+    match_department_name
+)
 
 from backend.config import get_llm
 
@@ -27,7 +34,14 @@ llm = get_llm()
 
 # ==================== ReAct 에이전트용 설정 ====================
 # ReAct 패턴: LLM이 필요시 자율적으로 툴을 호출할 수 있도록 설정
-tools = [retrieve_courses, list_departments, recommend_curriculum, get_search_help, match_department_name]  # 사용 가능한 툴 목록
+tools = [
+    retrieve_courses,
+    list_departments,
+    get_universities_by_department,
+    recommend_curriculum,
+    get_search_help,
+    match_department_name
+]  # 사용 가능한 툴 목록
 llm_with_tools = llm.bind_tools(tools)  # LLM에 툴 사용 권한 부여
 
 
@@ -235,11 +249,61 @@ def agent_node(state: MentorState) -> dict:
 
 학생 관심사: {interests_text}
 
-당신이 사용할 수 있는 툴은 다음 네 가지입니다:
+당신이 사용할 수 있는 툴은 다음과 같습니다:
 1. retrieve_courses — 특정 과목을 검색
-2. list_departments — 학과 목록 조회
-3. recommend_curriculum — 학기/학년별 커리큘럼 추천
-4. match_department_name — 학과명 정규화(컴공·소융·전전 등 → 공식 학과명)
+2. list_departments — 학과 목록 조회 (학과명만 반환)
+3. get_universities_by_department — 특정 학과가 있는 대학 목록 조회
+4. recommend_curriculum — 학기/학년별 커리큘럼 추천
+5. match_department_name — 학과명 정규화(컴공·소융·전전 등 → 공식 학과명)
+
+──────────────────────────────────────────
+[ 관심사 기반 학과 추천 Workflow - 3단계 프로세스 ]
+
+학생이 "내 관심사에 해당하는 학과 추천해줘" 같은 질문을 하면:
+
+** STEP 1: 학생 관심사 파싱 **
+   - 관심사는 쉼표(,)로 구분된 세부 항목 리스트입니다
+   - 예: "컴퓨터 / 소프트웨어 / 인공지능, 전기 / 전자 / 반도체, 수학 / 통계"
+   - "/" 기호로 구분된 각 키워드를 분리하세요
+   - 예: "컴퓨터 / 소프트웨어 / 인공지능" → ["컴퓨터", "소프트웨어", "인공지능"]
+
+** STEP 2: 모든 키워드에 대해 list_departments 호출 **
+   - list_departments(query="컴퓨터")
+   - list_departments(query="소프트웨어")
+   - list_departments(query="인공지능")
+   - list_departments(query="전기")
+   - ... 모든 키워드에 대해 반복
+
+** STEP 3: 학과 목록 + 설명 제공 **
+   - list_departments는 **학과명만** 반환합니다 (대학명 제외)
+   - 예: ["컴퓨터공학과", "소프트웨어학부", "전자공학과", ...]
+   - 각 학과에 대해 **간단한 설명을 생성**하세요:
+     * 해당 학과에서 무엇을 배우는지
+     * 어떤 진로와 연결되는지
+     * 학생의 관심사와 어떻게 연결되는지
+   - 출력 형식:
+     ```
+     관심사에 맞는 학과를 찾았습니다:
+
+     [컴퓨터 / 소프트웨어 / 인공지능 관련]
+     1. **컴퓨터공학과**
+        - 프로그래밍, 알고리즘, 데이터구조, 운영체제 등을 배웁니다
+        - AI, 백엔드 개발, 시스템 엔지니어 등의 진로로 이어집니다
+
+     2. **소프트웨어학부**
+        - 소프트웨어 설계, 개발 방법론, 프로젝트 관리 등을 배웁니다
+        - 웹/앱 개발, 프로젝트 매니저 등의 진로로 이어집니다
+
+     ... (다른 관심 분야도 동일하게)
+     ```
+
+** STEP 4: 학생이 특정 학과 선택 시 **
+   - 학생이 "컴퓨터공학과 어느 대학에 있어?" 같은 질문을 하면
+   - get_universities_by_department(department_name="컴퓨터공학과") 호출
+   - 대학명, 단과대학 정보와 함께 제공
+
+⚠️ 중요: list_departments는 학과명만 반환합니다. 대학 정보가 필요하면
+get_universities_by_department를 사용하세요!
 
 ──────────────────────────────────────────
 [ TOOL CALL RULE — 가장 중요한 규칙 ]
@@ -254,11 +318,27 @@ def agent_node(state: MentorState) -> dict:
 - 툴 없이 추측으로 답하기
 
 ──────────────────────────────────────────
-[ 학과명 관련 규칙 ]
+[ 학과명 정규화 규칙 - match_department_name 사용법 ]
 
-1. 질문에 학과명이 비표준(예: "컴공", "소융", "전전", "홍대 컴공")으로 들어오면  
-   → **match_department_name을 먼저 호출**해서 표준 학과명으로 바꾸세요.
-2. 표준화된 학과명/대학명을 확보한 뒤 retrieve_courses 또는 recommend_curriculum을 호출하세요.
+질문에 **비표준 학과명 또는 약칭**이 포함되어 있으면:
+1. **match_department_name을 먼저 호출**하여 표준 학과명으로 변환
+2. 변환된 표준 학과명으로 다른 툴 호출
+
+** 비표준 학과명 예시 **
+- "컴공" → "컴퓨터공학과"
+- "소융" → "소프트웨어융합학과"
+- "전전" → "전자전기공학과"
+- "홍대 컴공" → university="홍익대학교", department="컴퓨터공학과"
+- "서울대 전전" → university="서울대학교", department="전자공학과"
+
+** 처리 흐름 **
+1. 사용자: "홍대 컴공 커리큘럼 알려줘"
+2. match_department_name("홍대 컴공") 호출
+3. 결과: {{"university": "홍익대학교", "matched_department": "컴퓨터공학과"}}
+4. recommend_curriculum(university="홍익대학교", department="컴퓨터공학과") 호출
+
+⚠️ 중요: match_department_name은 대학명도 추출할 수 있습니다!
+결과에 "university" 필드가 있으면 그것도 함께 사용하세요.
 
 ──────────────────────────────────────────
 [ 반드시 Tool 호출해야 하는 질문 유형 ]
@@ -269,7 +349,7 @@ def agent_node(state: MentorState) -> dict:
 - "~과 무슨 과목 배우는지 알려줘"
 - "이 학과의 2~4학년 커리 알려줘"
 
-→ retrieve_courses 또는 recommend_curriculum 중 하나를 반드시 호출  
+→ retrieve_courses 또는 recommend_curriculum 중 하나를 반드시 호출
 → 추측 금지, 검색 기반으로만 답변
 
 ──────────────────────────────────────────
@@ -283,11 +363,16 @@ def agent_node(state: MentorState) -> dict:
 ──────────────────────────────────────────
 [ 학과 목록 질문 처리 ]
 
+질문 유형 1: 학과 목록 조회
 - "학과 뭐 있어?"
 - "공대 학과 종류?"
 - "컴퓨터 관련 학과 알려줘"
+→ list_departments 호출 (학과명만 반환)
 
-→ list_departments 반드시 호출
+질문 유형 2: 특정 학과가 있는 대학 조회
+- "컴퓨터공학과 어느 대학에 있어?"
+- "소프트웨어학부 개설 대학 알려줘"
+→ get_universities_by_department 호출 (대학명 + 단과대학 + 학과명 반환)
 
 ──────────────────────────────────────────
 [ 응답 규칙 ]
@@ -296,7 +381,6 @@ def agent_node(state: MentorState) -> dict:
 - 필요 없으면 자연어로만 답변
 - 항상 한국어로 답변
 
-      
 ──────────────────────────────────────────
 **[ 특별 지침 (커리큘럼 추천 시) ]**
 - 학생의 현재 질문에 **'표 형태로', '요약형으로', '상세형으로'와 같은 출력 형식 요청**이 포함되어 있다면,
