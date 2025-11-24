@@ -467,6 +467,46 @@ def recommend_curriculum(
     return curriculum
 
 
+
+
+@tool
+def match_department_name(department_query: str) -> dict:
+    """
+    학과명을 임베딩 기반으로 표준 학과명으로 매핑한다.
+    ex) '컴공' → '컴퓨터공학과'
+        '컴퓨터과' → '컴퓨터공학과'
+        '소프트웨어' → '소프트웨어학과'
+    """
+
+    vs = load_vectorstore()
+    embeddings = get_embeddings()
+
+    # Load all department names from metadata
+    collection = vs._collection
+    results = collection.get(include=["metadatas"])
+
+    # unique department list
+    departments = list({meta["department"] for meta in results["metadatas"] if meta.get("department")})
+
+    # embed user query
+    query_vec = embeddings.embed_query(department_query)
+
+    best_match = None
+    best_score = -999
+
+    for dept in departments:
+        dept_vec = embeddings.embed_query(dept)
+        sim = np.dot(query_vec, dept_vec) / (np.linalg.norm(query_vec) * np.linalg.norm(dept_vec))
+        if sim > best_score:
+            best_score = sim
+            best_match = dept
+
+    return {
+        "input": department_query,
+        "matched_department": best_match,
+        "similarity": best_score
+    }
+  
 @tool
 def get_search_help() -> str:
     """
