@@ -7,9 +7,10 @@ LangGraph 그래프를 구성하는 노드 함수들을 정의합니다.
 2. **Structured 패턴**: 미리 정해진 순서대로 실행되는 파이프라인 (retrieve_node, select_node, answer_node)
 """
 
-from typing import List
+from typing import List, Set
+import re
 from langchain_core.documents import Document
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage, AIMessage
 from langgraph.prebuilt import ToolNode
 from langgraph.constants import END
 from pydantic import BaseModel, Field
@@ -31,6 +32,92 @@ from backend.config import get_llm
 
 # LLM 인스턴스 생성 (.env에서 설정한 LLM_PROVIDER와 MODEL_NAME 사용)
 llm = get_llm()
+
+
+# ==================== Post-processing Validation ====================
+
+def extract_departments_from_tool_results(messages: List) -> Set[str]:
+    """
+    ToolMessage에서 list_departments가 반환한 학과명을 추출합니다.
+    """
+    all_departments = set()
+
+    for msg in messages:
+        if isinstance(msg, ToolMessage):
+            # list_departments 결과인지 확인
+            if "list_departments" in str(msg.name):
+                content = msg.content
+
+                # 백틱으로 감싸진 학과명 추출 (예: `컴퓨터공학과`)
+                pattern = r'`([^`]+)`'
+                departments = re.findall(pattern, content)
+                all_departments.update(departments)
+
+    return all_departments
+
+
+def validate_and_fix_department_names(
+    llm_response: str,
+    valid_departments: Set[str]
+) -> tuple[str, List[dict]]:
+    """
+    LLM 응답에서 학과명을 검증하고 수정합니다.
+
+    Args:
+        llm_response: LLM이 생성한 응답 텍스트
+        valid_departments: Tool에서 반환된 유효한 학과명 집합
+
+    Returns:
+        (수정된 응답, 위반 목록)
+    """
+    if not valid_departments:
+        return llm_response, []
+
+    # **학과명** 패턴 추출
+    pattern = r'\*\*([^*]+)\*\*'
+    mentioned_depts = re.findall(pattern, llm_response)
+
+    violations = []
+
+    for dept in mentioned_depts:
+        # 정확히 일치하는지 확인
+        if dept not in valid_departments:
+            # 유사한 학과 찾기 (Levenshtein 거리 또는 부분 매칭)
+            best_match = None
+            best_score = 0
+
+            for valid_dept in valid_departments:
+                # 1. 부분 문자열 매칭
+                if dept in valid_dept or valid_dept in dept:
+                    score = len(set(dept) & set(valid_dept)) / max(len(dept), len(valid_dept))
+                    if score > best_score:
+                        best_score = score
+                        best_match = valid_dept
+
+            # 유사도가 충분히 높으면 교체, 아니면 제거
+            if best_match and best_score > 0.5:
+                violations.append({
+                    "wrong": dept,
+                    "correct": best_match,
+                    "action": "replace",
+                    "score": best_score
+                })
+
+                # 응답에서 교체
+                llm_response = llm_response.replace(
+                    f"**{dept}**",
+                    f"**{best_match}**"
+                )
+            else:
+                # 매칭되는 학과가 없으면 경고만 (제거는 하지 않음)
+                violations.append({
+                    "wrong": dept,
+                    "correct": None,
+                    "action": "warn",
+                    "score": 0
+                })
+
+    return llm_response, violations
 
 # ==================== ReAct 에이전트용 설정 ====================
 # ReAct 패턴: LLM이 필요시 자율적으로 툴을 호출할 수 있도록 설정
@@ -247,6 +334,26 @@ def agent_node(state: MentorState) -> dict:
 당신은 학생들의 전공 선택을 도와주는 '대학 전공 탐색 멘토'입니다.
 반드시 한국어로만 답변하세요.
 
+🚨🚨🚨 **최우선 규칙 - 절대 위반 금지** 🚨🚨🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ Tool(list_departments, retrieve_courses, recommend_curriculum)이 반환한 학과명/과목명을:
+   **단 한 글자도 변경하지 마세요**
+   **괄호, 슬래시, 점(.) 등 모든 특수문자까지 정확히 복사하세요**
+   **절대로 요약, 일반화, 구조 변경을 하지 마세요**
+
+❌ 잘못된 예시:
+   Tool: "지능로봇" → 답변: "지능로봇공학과" (단어 추가 금지!)
+   Tool: "화공학부" → 답변: "화공학과" (학부를 학과로 변경 금지!)
+   Tool: "신소재공학" → 답변: "신소재공학과" (단어 추가 금지!)
+
+✅ 올바른 예시:
+   Tool: "지능로봇" → 답변: "지능로봇" (정확히 동일)
+   Tool: "화공학부" → 답변: "화공학부" (정확히 동일)
+   Tool: "신소재공학" → 답변: "신소재공학" (정확히 동일)
+
+⚠️ Tool 결과에 없는 학과명/과목명을 추측으로 만들어내는 것은 절대 금지입니다!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 학생 관심사: {interests_text}
 
 당신이 사용할 수 있는 툴은 다음과 같습니다:
@@ -275,6 +382,22 @@ def agent_node(state: MentorState) -> dict:
    - ... 모든 키워드에 대해 반복
 
 ** STEP 3: 학과 목록 + 설명 제공 **
+
+   🚨 **가장 중요한 규칙 - 학과명 정확성** 🚨
+   - ⚠️ **list_departments가 반환한 학과명을 한 글자도 바꾸지 말고 정확히 복사하세요**
+   - ⚠️ **괄호, 슬래시, 점(.) 등 모든 특수문자까지 정확히 복사하세요**
+   - ⚠️ **학과명을 요약하거나 일반화하면 안 됩니다**
+
+   잘못된 예시:
+   ❌ Tool 결과: "지능로봇공학과" → 답변: "로봇공학과" (단어 생략)
+   ❌ Tool 결과: "화공학부" → 답변: "화공학과" (학부를 학과로 변경)
+   ❌ Tool 결과: "컴퓨터공학부 소프트웨어전공" → 답변: "소프트웨어전공" (일부 생략)
+
+   올바른 예시:
+   ✅ Tool 결과: "지능로봇공학과" → 답변: "지능로봇공학과" (정확히 동일)
+   ✅ Tool 결과: "화공학부" → 답변: "화공학부" (정확히 동일)
+   ✅ Tool 결과: "컴퓨터공학부 소프트웨어전공" → 답변: "컴퓨터공학부 소프트웨어전공" (정확히 동일)
+
    - list_departments는 **학과명만** 반환합니다 (대학명 제외)
    - 예: ["컴퓨터공학과", "소프트웨어학부", "전자공학과", ...]
    - 각 학과에 대해 **간단한 설명을 생성**하세요:
@@ -374,12 +497,60 @@ get_universities_by_department를 사용하세요!
 - "소프트웨어학부 개설 대학 알려줘"
 → get_universities_by_department 호출 (대학명 + 단과대학 + 학과명 반환)
 
-──────────────────────────────────────────
+"──────────────────────────────────────────\n"
+"[ 학과명 사용에 관한 매우 중요한 규칙 ]\n\n"
+"1. list_departments, get_universities_by_department, recommend_curriculum 등\n"
+"   툴에서 전달된 학과명/과목명/대학명은 **문자 하나도 바꾸지 말고 그대로 사용**하세요.\n"
+"   - 예: 툴 결과가 '보건학과'이면 답변에도 반드시 '보건학과'라고 적어야 합니다.\n"
+"   - '보건행정학과', '보건정책학과'처럼 **툴에 없는 이름을 추측으로 만들면 안 됩니다.**\n\n"
+"2. 툴에서 주지 않은 새로운 학과명을 **추측으로 생성하지 마세요.**\n"
+"   - 예: 사용자가 '보건정책'이라는 관심사를 말해도,\n"
+"     DB에 '보건정책학과'가 없다면 그 이름을 만들어 쓰면 안 됩니다.\n"
+"   - 대신, list_departments 결과인 '보건학과', '행정학과' 등을 활용하여\n"
+"     \"보건정책에 관심이 있다면, 다음 학과들이 관련이 있을 수 있습니다\"처럼 설명하세요.\n\n"
+"3. 특정 관심사(예: '보건행정')에 대해 list_departments 결과가 완전히 비어 있거나\n"
+"   관련성이 떨어지는 소수의 학과만 나오는 경우에는, 그 관심사에 대해 이렇게 답변하세요.\n"
+"   - 예: \"현재 데이터베이스에 '보건행정'과 직접적으로 연결된 학과 정보는 없습니다.\">\n"
+"   - 그리고 툴 결과에 있는 학과명만 사용해, 간접적으로 연관된 학과를 안내하세요.\n\n"
+"4. 여러 학과가 비슷해 보이더라도, 서로 다른 이름이면 **각각 다른 학과**입니다.\n"
+"   - '통계학과'와 '정보통계학과'를 하나로 합쳐 '통계 관련 학과'로 이름을 바꾸지 마세요.\n"
+"   - 답변에서는 항상 툴에서 온 정식 이름을 그대로 사용하세요.\n\n"
+"5. 요약/설명 문장 안에서 학과명을 굵게(**학과명**) 표시하는 것은 괜찮지만,\n"
+"   굵게 표시된 텍스트 내용(글자)은 툴 결과와 100% 동일해야 합니다.\n"
+"──────────────────────────────────────────\n"
+
 [ 응답 규칙 ]
 
 - Tool이 필요하면 tool_calls 포함
 - 필요 없으면 자연어로만 답변
 - 항상 한국어로 답변
+
+"──────────────────────────────────────────\n"
+"[ Tool 사용 결과 활용 규칙 ]\n"
+"\n"
+"🚨 **모든 Tool 결과에 대한 정확성 규칙** 🚨\n"
+"\n"
+"1. **list_departments 결과 사용 시**\n"
+"   - ⚠️ 반환된 학과명을 **한 글자도 바꾸지 말고** 정확히 복사하세요\n"
+"   - ⚠️ 괄호, 슬래시, 점 등 **모든 특수문자까지** 정확히 복사하세요\n"
+"   - ⚠️ 절대 요약하거나 일반화하거나 구조를 변경하지 마세요\n"
+"   - ❌ 잘못된 예: Tool 결과 '지능로봇공학과' → 답변 '로봇공학과'\n"
+"   - ✅ 올바른 예: Tool 결과 '지능로봇공학과' → 답변 '지능로봇공학과'\n"
+"\n"
+"2. **retrieve_courses 결과 사용 시**\n"
+"   - ⚠️ 반환된 과목명/학과명을 **한 글자도 바꾸지 말고** 정확히 복사하세요\n"
+"   - ⚠️ 괄호, 슬래시, 점 등 **모든 특수문자까지** 정확히 복사하세요\n"
+"   - ⚠️ 절대 요약하거나 일반화하거나 구조를 변경하지 마세요\n"
+"\n"
+"3. **recommend_curriculum 결과 사용 시**\n"
+"   - ⚠️ 반환된 과목명을 **한 글자도 바꾸지 말고** 정확히 복사하세요\n"
+"   - ⚠️ 괄호, 슬래시, 점 등 **모든 특수문자까지** 정확히 복사하세요\n"
+"   - ⚠️ 절대 요약하거나 일반화하거나 구조를 변경하지 마세요\n"
+"\n"
+"⚠️ **절대 금지 사항**\n"
+"- Tool 결과를 무시하고 사용자 입력만으로 새로운 학과명/과목명을 만들면 안 됩니다\n"
+"- Tool 결과를 일반화/요약/변경하면 안 됩니다 (예: '화공학부' → '화공학과' 변경 금지)\n"
+"- Tool 결과에 없는 학과명/과목명을 추측으로 생성하면 안 됩니다\n"
 
 ──────────────────────────────────────────
 **[ 특별 지침 (커리큘럼 추천 시) ]**
@@ -434,7 +605,35 @@ get_universities_by_department를 사용하세요!
                     }]
                 )
 
-    # 4. LLM의 응답(response)을 messages에 추가하여 상태 업데이트
+    # 4. Post-processing Validation: LLM이 최종 답변을 생성한 경우 학과명 검증
+    if has_tool_results and (not hasattr(response, "tool_calls") or not response.tool_calls):
+        # Tool 결과에서 유효한 학과명 추출
+        valid_departments = extract_departments_from_tool_results(messages)
+
+        if valid_departments and hasattr(response, "content") and response.content:
+            print(f"\n🔍 [Validation] Checking department names... (Valid: {len(valid_departments)})")
+
+            # 학과명 검증 및 수정
+            corrected_content, violations = validate_and_fix_department_names(
+                response.content,
+                valid_departments
+            )
+
+            # 위반 사항이 있으면 로그 출력 및 수정 적용
+            if violations:
+                print(f"⚠️  [Validation] Found {len(violations)} violations:")
+                for v in violations:
+                    if v["action"] == "replace":
+                        print(f"   🔧 FIXED: '{v['wrong']}' → '{v['correct']}' (score: {v['score']:.2f})")
+                    elif v["action"] == "warn":
+                        print(f"   ⚠️  WARNING: '{v['wrong']}' not found in tool results")
+
+                # 수정된 내용으로 응답 업데이트
+                response.content = corrected_content
+            else:
+                print(f"✅ [Validation] All department names are accurate!")
+
+    # 5. LLM의 응답(response)을 messages에 추가하여 상태 업데이트
     #    → should_continue가 tool_calls 유무를 확인하여 다음 노드 결정
     return {"messages": [response]}
 

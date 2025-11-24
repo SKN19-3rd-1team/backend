@@ -82,6 +82,78 @@ def _load_department_embeddings():
     _DEPT_EMBEDDINGS_CACHE = np.array(dept_vecs)
     return _DEPT_NAMES_CACHE, _DEPT_EMBEDDINGS_CACHE
 
+# ===== 전공 대분류/세부분류 카테고리 =====
+MAIN_CATEGORIES = {
+    "공학": ["컴퓨터 / 소프트웨어 / 인공지능", "전기 / 전자 / 반도체", "기계 / 자동차 / 로봇",
+             "화학 / 화공 / 신소재", "산업공학 / 시스템 / 데이터분석", "건축 / 토목 / 도시",
+             "에너지 / 환경 / 원자력"],
+    "자연과학": ["수학 / 통계", "물리 / 천문", "화학", "생명과학 / 바이오", "지구과학 / 환경"],
+    "의약·보건": ["약학", "간호", "보건행정 / 보건정책"],
+    "경영·경제·회계": ["경영(마케팅, 인사, 전략 등)", "경제 / 금융 / 금융공학", "회계 / 세무"],
+    "사회과학": ["행정 / 정책", "정치 / 외교 / 국제관계", "사회 / 사회복지",
+                "심리 / 상담", "언론 / 미디어 / 광고 / PR"],
+    "인문": ["국어 / 문학", "영어 / 외국어", "역사 / 고고학", "철학 / 인류학 / 종교학"],
+    "교육": ["교육학 / 교과교육(국영수 등)", "유아교육 / 특수교육"],
+    "예체능": ["미술 / 회화 / 조소", "디자인(시각, 산업, UX/UI 등)",
+             "음악 / 작곡 / 연주 / 보컬", "체육 / 스포츠 / 운동재활"],
+    "융합/신산업": ["데이터사이언스 / 빅데이터", "인공지능 / 로봇 / 자율주행",
+                  "게임 / 인터랙티브콘텐츠", "영상 / 콘텐츠 / 유튜브 / 방송",
+                  "스타트업 / 창업"]
+}
+
+import re
+
+# list_departments 쿼리 확장 함수
+def _expand_category_query(query: str) -> tuple[list[str], str]:
+    """
+    list_departments용 쿼리 확장:
+    - 대분류(key)를 넣으면: 해당 key에 속한 모든 세부 value들을 풀어서 키워드로 사용
+    - 세부 분류(value)를 넣으면: "컴퓨터 / 소프트웨어 / 인공지능" → ["컴퓨터","소프트웨어","인공지능"]
+    - 그 외 일반 텍스트: "/", "," 기준으로 토큰 나눈 뒤 사용
+
+    Returns:
+        tokens: ["컴퓨터", "소프트웨어", "인공지능", ...]
+        embed_text: "컴퓨터 소프트웨어 인공지능 ..." (임베딩에 넣을 문자열)
+    """
+    raw = query.strip()
+    if not raw:
+        return [], ""
+
+    tokens: list[str] = []
+
+    # 1) 대분류(key) 입력인 경우 → 해당 key의 모든 세부 value를 한꺼번에 풀어서 사용
+    if raw in MAIN_CATEGORIES:
+        details = MAIN_CATEGORIES[raw]
+        for item in details:
+            parts = [p.strip() for p in re.split(r"[\/,()]", item) if p.strip()]
+            tokens.extend(parts)
+
+    # 2) 세부 분류(value) 그대로 들어온 경우
+    elif any(raw in v for values in MAIN_CATEGORIES.values() for v in values):
+        parts = [p.strip() for p in re.split(r"[\/,()]", raw) if p.strip()]
+        tokens.extend(parts)
+
+    # 3) 일반 텍스트 쿼리 (예: "컴퓨터 / 소프트웨어 / 인공지능", "AI, 데이터")
+    else:
+        parts = [p.strip() for p in re.split(r"[\/,]", raw) if p.strip()]
+        if parts:
+            tokens.extend(parts)
+        else:
+            tokens.append(raw)
+
+    # 중복 제거(순서 유지)
+    seen = set()
+    dedup_tokens = []
+    for t in tokens:
+        if t not in seen:
+            seen.add(t)
+            dedup_tokens.append(t)
+
+    embed_text = " ".join(dedup_tokens) if dedup_tokens else raw
+    return dedup_tokens, embed_text
+
+
+
 @tool
 def retrieve_courses(
     query: Optional[str] = None,
@@ -94,6 +166,7 @@ def retrieve_courses(
 ) -> List[Dict[str, Any]]:
     """
     대학 과목 데이터베이스에서 관련 과목을 검색합니다.
+    학과명은 임베딩 기반으로 자동 정규화되어 유연한 검색을 지원합니다.
 
     ** 중요: 이 함수는 LLM이 자율적으로 호출할 수 있는 Tool입니다 **
     ** 학생이 특정 대학, 학과, 과목에 대해 질문하면 반드시 이 툴을 먼저 호출해야 합니다! **
@@ -113,7 +186,7 @@ def retrieve_courses(
                query가 없으면 다른 파라미터들로 자동 생성됩니다.
         university: 대학교 이름 (옵션, 예: "서울대학교", "홍익대학교")
         college: 단과대학 이름 (옵션, 예: "공과대학", "자연과학대학")
-        department: 학과 이름 (옵션, 예: "컴퓨터공학", "전자공학")
+        department: 학과 이름 (옵션, 예: "컴퓨터공학", "전자공학", "바이오융합")
         grade: 학년 (옵션, 예: "1학년", "2학년")
         semester: 학기 (옵션, 예: "1학기", "2학기")
         top_k: 검색할 과목 수 (기본값: 5)
@@ -238,41 +311,25 @@ def get_course_detail(course_id: str, courses_context: List[Dict[str, Any]]) -> 
 
 
 @tool
-def list_departments(query: str) -> List[str]:
+def list_departments(query: str, top_k: int = 10) -> List[str]:
     """
     Vector DB에 있는 학과 목록을 조회합니다. (학과명만 반환, 대학명 제외)
+    임베딩 + 키워드 기반 하이브리드 검색으로 유연한 학과명 매칭을 지원합니다.
 
-    ** 중요: 이 툴은 학과 **목록 조회**에만 사용하세요! **
-    ** ⚠️ 특정 대학/학과의 과목 정보가 필요하면 retrieve_courses를 사용하세요! **
-
-    ** 올바른 사용 시나리오 (목록 조회) **
-    ✅ "어떤 학과들이 있어?" -> query="전체" 로 호출
-    ✅ "컴퓨터 관련 학과 목록 알려줘" -> query="컴퓨터" 로 호출
-    ✅ "공대에는 어떤 학과가 있어?" -> query="공학" 로 호출
-
-    ** 잘못된 사용 시나리오 (과목 정보 필요) **
-    ❌ "홍익대학교 컴퓨터공학" -> retrieve_courses를 사용해야 함
-    ❌ "서울대 전자공학과" -> retrieve_courses를 사용해야 함
-    ❌ "컴퓨터공학 과목 추천해줘" -> retrieve_courses를 사용해야 함
-
-    Args:
-        query: 검색할 키워드 (예: "컴퓨터", "공학", "전체", "전자")
-                "전체"를 입력하면 모든 학과를 반환합니다.
-
-    Returns:
-        학과명 리스트 (중복 제거됨): ["컴퓨터공학과", "소프트웨어학부", "전자공학과", ...]
+    - query = "전체" → 모든 학과
+    - query = "공학" → 공학 대분류 전체 (컴퓨터/전기/기계/화공/산업/건축/에너지 ...)
+    - query = "컴퓨터 / 소프트웨어 / 인공지능" → 해당 value 기반으로 학과 검색
     """
     print(f"✅ Using list_departments tool with query: '{query}'")
 
     vs = load_vectorstore()
     collection = vs._collection
 
-    # 모든 메타데이터 가져오기
+    # 전체 메타데이터 조회
     results = collection.get(include=['metadatas'])
 
-    # 학과명만 추출 (중복 제거)
     departments_set = set()
-    all_departments_with_info = []  # 필터링을 위해 전체 정보 보관
+    all_departments_with_info = []
 
     for meta in results['metadatas']:
         university = meta.get('university', '')
@@ -287,31 +344,102 @@ def list_departments(query: str) -> List[str]:
                 "department": department
             })
 
-    # 쿼리 필터링
+    # 0. 전체 요청이면 전부 반환
     if query.strip() == "전체" or not query.strip():
-        # 전체 학과명 반환
         result = sorted(list(departments_set))
-    else:
-        # 키워드로 필터링 (대학, 단과대학, 학과명에서 검색)
-        query_lower = query.lower()
-        matching_departments = set()
+        print(f"✅ Found {len(result)} unique departments (all)")
+        return result
 
-        for dept_info in all_departments_with_info:
-            if (query_lower in dept_info['university'].lower() or
-                query_lower in dept_info['college'].lower() or
-                query_lower in dept_info['department'].lower()):
-                matching_departments.add(dept_info['department'])
+    # 1. 카테고리/키워드 쿼리 확장
+    tokens, embed_text = _expand_category_query(query)
+    if not tokens:
+        tokens = [query.strip()]
+    query_tokens_lower = [t.lower() for t in tokens]
+    print(f"   ℹ️ Expanded query tokens: {query_tokens_lower}")
+    print(f"   ℹ️ Embedding text: '{embed_text}'")
 
-        result = sorted(list(matching_departments))
+    # 2. 문자열 기반 매칭 (여러 토큰 중 하나라도 포함되면 매칭)
+    matching_departments = set()
+    for dept_info in all_departments_with_info:
+        univ_l = dept_info['university'].lower()
+        college_l = dept_info['college'].lower()
+        dept_l = dept_info['department'].lower()
 
-    print(f"✅ Found {len(result)} unique departments matching '{query}'")
+        if any(
+            tok in univ_l or tok in college_l or tok in dept_l
+            for tok in query_tokens_lower
+        ):
+            matching_departments.add(dept_info['department'])
 
-    # 검색 결과가 없을 때 예외처리
-    if not result:
-        print(f"⚠️  WARNING: No departments found matching '{query}'")
+    print(f"   ℹ️ String match found {len(matching_departments)} departments")
+
+    # 3. 임베딩 기반 유사도 검색 (항상 수행해서 하이브리드 형태로 사용)
+    embedding_candidates: list[str] = []
+    try:
+        embeddings = get_embeddings()
+        departments, dept_matrix = _load_department_embeddings()
+
+        # 카테고리 전체 의미를 반영한 문장을 임베딩
+        query_vec = np.array(embeddings.embed_query(embed_text))
+
+        norms = np.linalg.norm(dept_matrix, axis=1) * np.linalg.norm(query_vec)
+        norms = np.where(norms == 0, 1e-10, norms)
+        sims = (dept_matrix @ query_vec) / norms
+
+        # 상위 후보 + threshold
+        threshold = 0.45  # 살짝 완화해서 "특이하지만 유사한" 학과까지 포착
+        top_indices = np.argsort(sims)[::-1]
+
+        for idx in top_indices:
+            if len(embedding_candidates) >= top_k:
+                break
+            if sims[idx] < threshold:
+                break
+            dept_name = departments[idx]
+            embedding_candidates.append(dept_name)
+            print(f"   - [emb] {dept_name} (similarity: {sims[idx]:.3f})")
+
+    except Exception as e:
+        print(f"⚠️  Error during embedding search: {e}")
+
+    # 4. 문자열 + 임베딩 결과 합치기 (하이브리드)
+    combined = list(
+        dict.fromkeys(  # 순서 유지 + 중복 제거
+            list(matching_departments) + embedding_candidates
+        )
+    )
+
+    if not combined:
+        print("⚠️  WARNING: No departments found (string + embedding)")
         return ["검색 결과가 없습니다. 다른 키워드로 검색해보세요."]
 
-    return result
+    # 최종 결과는 너무 길지 않게 top_k 만큼만 자르기
+    result = combined[:top_k]
+    print(f"✅ Returning {len(result)} departments (hybrid string + embedding)")
+
+    # 📝 구조화된 포맷으로 반환 (LLM이 복사하기 쉽게)
+    formatted_output = "=" * 80 + "\n"
+    formatted_output += f"🎯 검색 결과: '{query}'에 대한 학과 {len(result)}개\n"
+    formatted_output += "=" * 80 + "\n\n"
+    formatted_output += "📋 **정확한 학과명 목록** (아래 백틱 안의 이름을 그대로 복사하세요):\n\n"
+
+    for i, dept in enumerate(result, 1):
+        formatted_output += f"{i}. `{dept}`\n"
+
+    formatted_output += "\n" + "=" * 80 + "\n"
+    formatted_output += "🚨 **중요 - 답변 작성 규칙**:\n"
+    formatted_output += "   1. 백틱(`) 안의 학과명을 **한 글자도 바꾸지 말고** 복사하세요\n"
+    formatted_output += "   2. 위 목록에 없는 학과명을 절대 만들지 마세요\n"
+    formatted_output += "   3. '과', '부', '전공' 등을 추가/제거하지 마세요\n\n"
+    formatted_output += "   올바른 예시:\n"
+    formatted_output += "   - 목록에 `지능로봇`이 있으면 → 답변: **지능로봇** ✅\n"
+    formatted_output += "   - 목록에 `화공학부`가 있으면 → 답변: **화공학부** ✅\n\n"
+    formatted_output += "   잘못된 예시:\n"
+    formatted_output += "   - 목록에 `지능로봇`인데 → 답변: **지능로봇공학과** ❌ (단어 추가)\n"
+    formatted_output += "   - 목록에 `화공학부`인데 → 답변: **화공학과** ❌ (학부→학과 변경)\n"
+    formatted_output += "=" * 80
+
+    return formatted_output
 
 
 @tool
