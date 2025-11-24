@@ -56,6 +56,31 @@ def _get_tool_usage_guide() -> str:
 더 구체적인 질문을 해주시면 더 정확한 정보를 제공해드릴 수 있습니다!
 """
 
+# 학과 임베딩 캐싱 함수
+_DEPT_EMBEDDINGS_CACHE = None
+_DEPT_NAMES_CACHE = None
+
+def _load_department_embeddings():
+    global _DEPT_EMBEDDINGS_CACHE, _DEPT_NAMES_CACHE
+    if _DEPT_EMBEDDINGS_CACHE is not None:
+        return _DEPT_NAMES_CACHE, _DEPT_EMBEDDINGS_CACHE
+
+    vs = load_vectorstore()
+    embeddings = get_embeddings()
+
+    collection = vs._collection
+    results = collection.get(include=["metadatas"])
+
+    departments = sorted({meta["department"]
+                          for meta in results["metadatas"]
+                          if meta.get("department")})
+
+    # 🔹 한 번에 배치 임베딩 (OpenAI는 내부에서 알아서 배치 처리)
+    dept_vecs = embeddings.embed_documents(departments)
+
+    _DEPT_NAMES_CACHE = departments
+    _DEPT_EMBEDDINGS_CACHE = np.array(dept_vecs)
+    return _DEPT_NAMES_CACHE, _DEPT_EMBEDDINGS_CACHE
 
 @tool
 def retrieve_courses(
@@ -477,34 +502,27 @@ def match_department_name(department_query: str) -> dict:
         '컴퓨터과' → '컴퓨터공학과'
         '소프트웨어' → '소프트웨어학과'
     """
-
-    vs = load_vectorstore()
     embeddings = get_embeddings()
 
-    # Load all department names from metadata
-    collection = vs._collection
-    results = collection.get(include=["metadatas"])
+    # 1) 캐시된 학과명 + 임베딩 불러오기 (한 번만 계산)
+    departments, dept_matrix = _load_department_embeddings()
 
-    # unique department list
-    departments = list({meta["department"] for meta in results["metadatas"] if meta.get("department")})
+    # 2) 쿼리 임베딩만 새로 계산 (1회 호출)
+    query_vec = np.array(embeddings.embed_query(department_query))
 
-    # embed user query
-    query_vec = embeddings.embed_query(department_query)
+    # 3) 전체 학과와의 코사인 유사도 한 번에 계산
+    #    (벡터 연산으로 처리 → 파이썬 for-loop 최소화)
+    norms = np.linalg.norm(dept_matrix, axis=1) * np.linalg.norm(query_vec)
+    sims = (dept_matrix @ query_vec) / norms
 
-    best_match = None
-    best_score = -999
-
-    for dept in departments:
-        dept_vec = embeddings.embed_query(dept)
-        sim = np.dot(query_vec, dept_vec) / (np.linalg.norm(query_vec) * np.linalg.norm(dept_vec))
-        if sim > best_score:
-            best_score = sim
-            best_match = dept
+    best_idx = int(np.argmax(sims))
+    best_match = departments[best_idx]
+    best_score = float(sims[best_idx])
 
     return {
         "input": department_query,
         "matched_department": best_match,
-        "similarity": best_score
+        "similarity": best_score,
     }
   
 @tool
