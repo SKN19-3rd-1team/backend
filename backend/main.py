@@ -44,7 +44,7 @@ def get_graph(mode: str = "react"):
     else:
         raise ValueError(f"Unknown mode: {mode}")
 
-def run_mentor(question: str, interests: str | None = None, mode: str = "react") -> str:
+def run_mentor(question: str, interests: str | None = None, mode: str = "react", chat_history: list[dict] | None = None) -> str | dict:
     """
     멘토 시스템을 실행하여 학생의 질문에 답변합니다.
 
@@ -70,16 +70,31 @@ def run_mentor(question: str, interests: str | None = None, mode: str = "react")
     # 1. 캐싱된 그래프 인스턴스 가져오기
     graph = get_graph(mode=mode)
 
+    messages = []
+    if chat_history:
+        for msg in chat_history:
+            # LLM이 이전 메시지를 이해하고 맥락을 이어가도록 함
+            if msg["role"] == "user":
+                messages.append(HumanMessage(content=msg["content"]))
+            elif msg["role"] == "assistant":
+                messages.append(HumanMessage(content=msg["content"]))
+
+    # 마지막 질문을 추가
+    messages.append(HumanMessage(content=question))
+
     if mode == "react":
         # ==================== ReAct 모드 ====================
         # messages 기반 상태 초기화
         state = {
-            "messages": [HumanMessage(content=question)],  # 사용자 메시지로 시작
+            "messages": messages,  # 사용자 메시지로 시작
             "interests": interests,
         }
 
         # 그래프 실행: agent ⇄ tools 반복하며 답변 생성
         final_state = graph.invoke(state)
+
+        if 'awaiting_user_input' in final_state:
+            return final_state
 
         # 마지막 메시지(LLM의 최종 답변)에서 텍스트 추출
         messages = final_state.get("messages", [])
