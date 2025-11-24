@@ -18,9 +18,10 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Iterable
+import threading
 
 from langchain_core.documents import Document
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 
 from backend.config import get_settings, resolve_path, expand_paths
 from .embeddings import get_embeddings
@@ -29,6 +30,7 @@ from .embeddings import get_embeddings
 # 여러 툴이 동시에 호출될 때 Chroma 인스턴스를 중복 생성하지 않도록 전역 변수에 캐싱
 # ChromaDB 1.3.4의 재초기화 버그를 방지하기 위해 한 번만 로드하고 재사용
 _VECTORSTORE_CACHE = None
+_VECTORSTORE_LOCK = threading.Lock()
 
 
 def _resolve_persist_dir(persist_directory: Path | str | None) -> Path:
@@ -130,24 +132,26 @@ def load_vectorstore(persist_directory: Path | str | None = None):
 
     # 이미 로드된 인스턴스가 있으면 재사용 (싱글톤 패턴)
     # 여러 툴이 호출되어도 Vector Store는 한 번만 로딩됨
-    if _VECTORSTORE_CACHE is not None:
+    # Lock을 사용하여 동시 접근 시 Chroma 인스턴스 생성을 직렬화
+    with _VECTORSTORE_LOCK:
+        if _VECTORSTORE_CACHE is not None:
+            return _VECTORSTORE_CACHE
+
+        # 저장 디렉토리 경로 해석
+        persist_directory = _resolve_persist_dir(persist_directory)
+
+        # 임베딩 모델 로드 (Vector DB 생성 시 사용한 것과 동일해야 함)
+        embeddings = get_embeddings()
+
+        # 디스크에서 Chroma DB 로드
+        # - persist_directory의 SQLite 파일과 벡터 데이터 읽기
+        # - embedding_function으로 새 쿼리를 임베딩하여 검색
+        _VECTORSTORE_CACHE = Chroma(
+            embedding_function=embeddings,
+            persist_directory=str(persist_directory),
+        )
+
         return _VECTORSTORE_CACHE
-
-    # 저장 디렉토리 경로 해석
-    persist_directory = _resolve_persist_dir(persist_directory)
-
-    # 임베딩 모델 로드 (Vector DB 생성 시 사용한 것과 동일해야 함)
-    embeddings = get_embeddings()
-
-    # 디스크에서 Chroma DB 로드
-    # - persist_directory의 SQLite 파일과 벡터 데이터 읽기
-    # - embedding_function으로 새 쿼리를 임베딩하여 검색
-    _VECTORSTORE_CACHE = Chroma(
-        embedding_function=embeddings,
-        persist_directory=str(persist_directory),
-    )
-
-    return _VECTORSTORE_CACHE
 
 
 if __name__ == "__main__":

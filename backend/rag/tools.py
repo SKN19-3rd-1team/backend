@@ -238,9 +238,9 @@ def get_course_detail(course_id: str, courses_context: List[Dict[str, Any]]) -> 
 
 
 @tool
-def list_departments(query: str) -> List[Dict[str, str]]:
+def list_departments(query: str) -> List[str]:
     """
-    Vector DB에 있는 학과 목록을 조회합니다.
+    Vector DB에 있는 학과 목록을 조회합니다. (학과명만 반환, 대학명 제외)
 
     ** 중요: 이 툴은 학과 **목록 조회**에만 사용하세요! **
     ** ⚠️ 특정 대학/학과의 과목 정보가 필요하면 retrieve_courses를 사용하세요! **
@@ -260,11 +260,7 @@ def list_departments(query: str) -> List[Dict[str, str]]:
                 "전체"를 입력하면 모든 학과를 반환합니다.
 
     Returns:
-        학과 리스트 [
-            {"university": "서울대학교", "college": "공과대학", "department": "컴퓨터공학"},
-            {"university": "홍익대학교", "college": "공과대학", "department": "컴퓨터공학"},
-            ...
-        ]
+        학과명 리스트 (중복 제거됨): ["컴퓨터공학과", "소프트웨어학부", "전자공학과", ...]
     """
     print(f"✅ Using list_departments tool with query: '{query}'")
 
@@ -274,49 +270,106 @@ def list_departments(query: str) -> List[Dict[str, str]]:
     # 모든 메타데이터 가져오기
     results = collection.get(include=['metadatas'])
 
-    # 학과 정보 추출 (중복 제거)
+    # 학과명만 추출 (중복 제거)
     departments_set = set()
+    all_departments_with_info = []  # 필터링을 위해 전체 정보 보관
+
     for meta in results['metadatas']:
         university = meta.get('university', '')
         college = meta.get('college', '')
         department = meta.get('department', '')
 
         if department:
-            # Tuple로 중복 제거
-            departments_set.add((university, college, department))
+            departments_set.add(department)
+            all_departments_with_info.append({
+                "university": university,
+                "college": college,
+                "department": department
+            })
+
+    # 쿼리 필터링
+    if query.strip() == "전체" or not query.strip():
+        # 전체 학과명 반환
+        result = sorted(list(departments_set))
+    else:
+        # 키워드로 필터링 (대학, 단과대학, 학과명에서 검색)
+        query_lower = query.lower()
+        matching_departments = set()
+
+        for dept_info in all_departments_with_info:
+            if (query_lower in dept_info['university'].lower() or
+                query_lower in dept_info['college'].lower() or
+                query_lower in dept_info['department'].lower()):
+                matching_departments.add(dept_info['department'])
+
+        result = sorted(list(matching_departments))
+
+    print(f"✅ Found {len(result)} unique departments matching '{query}'")
+
+    # 검색 결과가 없을 때 예외처리
+    if not result:
+        print(f"⚠️  WARNING: No departments found matching '{query}'")
+        return ["검색 결과가 없습니다. 다른 키워드로 검색해보세요."]
+
+    return result
+
+
+@tool
+def get_universities_by_department(department_name: str) -> List[Dict[str, str]]:
+    """
+    특정 학과가 있는 대학 목록을 조회합니다.
+
+    ** 사용 시나리오 **
+    - 학생이 특정 학과를 선택한 후, 해당 학과가 있는 대학들을 보여줄 때 사용
+    - 예: "컴퓨터공학과"를 선택하면 → 서울대, 연세대, 고려대 등 목록 제공
+
+    Args:
+        department_name: 학과명 (예: "컴퓨터공학과", "소프트웨어학부")
+
+    Returns:
+        대학 정보 리스트 [
+            {"university": "서울대학교", "college": "공과대학", "department": "컴퓨터공학과"},
+            {"university": "연세대학교", "college": "공과대학", "department": "컴퓨터공학과"},
+            ...
+        ]
+    """
+    print(f"✅ Using get_universities_by_department tool for: '{department_name}'")
+
+    vs = load_vectorstore()
+    collection = vs._collection
+
+    # 모든 메타데이터 가져오기
+    results = collection.get(include=['metadatas'])
+
+    # 해당 학과가 있는 대학 찾기
+    universities_set = set()
+    for meta in results['metadatas']:
+        university = meta.get('university', '')
+        college = meta.get('college', '')
+        department = meta.get('department', '')
+
+        # 정확한 매칭 또는 부분 매칭
+        if department and (department == department_name or department_name in department):
+            universities_set.add((university, college, department))
 
     # 리스트로 변환
-    all_departments = [
+    result = [
         {
             "university": univ,
             "college": college,
             "department": dept
         }
-        for univ, college, dept in sorted(departments_set)
+        for univ, college, dept in sorted(universities_set)
     ]
 
-    # 쿼리 필터링
-    if query.strip() == "전체" or not query.strip():
-        result = all_departments
-    else:
-        # 키워드로 필터링 (대학, 단과대학, 학과명에서 검색)
-        query_lower = query.lower()
-        result = [
-            dept_info for dept_info in all_departments
-            if (query_lower in dept_info['university'].lower() or
-                query_lower in dept_info['college'].lower() or
-                query_lower in dept_info['department'].lower())
-        ]
+    print(f"✅ Found {len(result)} universities offering '{department_name}'")
 
-    print(f"✅ Found {len(result)} departments matching '{query}'")
-
-    # 검색 결과가 없을 때 예외처리
     if not result:
-        print(f"⚠️  WARNING: No departments found matching '{query}'")
+        print(f"⚠️  WARNING: No universities found offering '{department_name}'")
         return [{
             "error": "no_results",
-            "message": "사용자 질문에 대한 정보를 가져올 수 없었습니다.",
-            "suggestion": "get_search_help 툴을 사용하여 검색 가능한 방법을 안내하세요."
+            "message": f"'{department_name}' 학과를 개설한 대학을 찾을 수 없습니다.",
+            "suggestion": "학과명을 정확히 확인하거나 list_departments로 사용 가능한 학과 목록을 먼저 조회하세요."
         }]
 
     return result
@@ -330,7 +383,8 @@ def recommend_curriculum(
     start_grade: int = 2,
     start_semester: int = 1,
     end_grade: int = 4,
-    end_semester: int = 2
+    end_semester: int = 2,
+    courses_per_semester: int = 5
 ) -> List[Dict[str, Any]]:
     """
     학생의 관심사를 고려하여 학기별 맞춤 커리큘럼을 추천합니다.
@@ -352,13 +406,18 @@ def recommend_curriculum(
         start_semester: 시작 학기 (기본값: 1)
         end_grade: 종료 학년 (기본값: 4)
         end_semester: 종료 학기 (기본값: 2)
+        courses_per_semester: 학기당 추천 과목 수 (기본값: 5)
 
     Returns:
         학기별 추천 과목 리스트 [
             {
                 "semester": "2학년 1학기",
-                "course": {"name": "...", "description": "...", "classification": "..."},
-                "reason": "인공지능 관심사와 관련이 높음"
+                "courses": [
+                    {"name": "...", "description": "...", "classification": "..."},
+                    {"name": "...", "description": "...", "classification": "..."},
+                    ...
+                ],
+                "count": 5
             },
             ...
         ]
@@ -399,18 +458,19 @@ def recommend_curriculum(
             print(f"   [{semester_label}] Searching with filter: {filter_dict}")
 
             try:
-                # 해당 학기 과목 검색
+                # 해당 학기 과목 검색 (더 많은 후보 가져오기)
                 docs = retrieve_with_filter(
                     question=interests if interests else "추천 과목",
-                    search_k=10,  # 후보 많이 가져오기
+                    search_k=20,  # 학기당 5개 선택하므로 더 많은 후보 필요
                     metadata_filter=chroma_filter
                 )
 
                 if not docs:
                     curriculum.append({
                         "semester": semester_label,
-                        "course": None,
-                        "reason": "해당 학기에 개설된 과목이 없습니다."
+                        "courses": [],
+                        "count": 0,
+                        "message": "해당 학기에 개설된 과목이 없습니다."
                     })
                     continue
 
@@ -424,60 +484,59 @@ def recommend_curriculum(
                     print(f"   ⚠️  [{semester_label}] 모든 과목이 이미 선택됨")
                     curriculum.append({
                         "semester": semester_label,
-                        "course": None,
-                        "reason": "해당 학기의 과목이 이미 다른 학기에 선택되었습니다."
+                        "courses": [],
+                        "count": 0,
+                        "message": "해당 학기의 과목이 이미 다른 학기에 선택되었습니다."
                     })
                     continue
 
-                # 관심사가 있으면 유사도 기반으로 정렬
-                if interests_embedding and interests:
-                    # 성능 개선: Vector Store의 유사도 검색 활용
-                    # 이미 검색된 docs는 유사도 순으로 정렬되어 있음
-                    # 관심사로 한 번 더 검색하는 대신, 검색 결과 순서 활용
-                    print(f"   [Optimization] Using vector store similarity scores (skipping re-embedding)")
+                # 학기당 최대 courses_per_semester개 과목 선택
+                selected_courses = []
+                for i, doc in enumerate(available_docs[:courses_per_semester]):
+                    meta = doc.metadata
+                    course_name = meta.get("name", "[이름 없음]")
 
-                    # available_docs는 이미 similarity_search로 정렬된 상태
-                    # 관심사와 가장 유사한 과목이 앞에 있을 가능성이 높음
-                    best_doc = available_docs[0]
-                    reason = f"'{interests}' 관심사 관련 과목 (검색 결과 기준)"
-                else:
-                    # 관심사 없으면 첫 번째 과목 선택
-                    best_doc = available_docs[0]
-                    reason = "해당 학기 대표 과목"
+                    # 중복 체크
+                    if course_name in selected_course_names:
+                        continue
 
-                meta = best_doc.metadata
-                course_name = meta.get("name", "[이름 없음]")
+                    # 선택된 과목 추가
+                    selected_course_names.add(course_name)
 
-                # 선택된 과목 추가
-                selected_course_names.add(course_name)
+                    # 실제 메타데이터 로깅 (디버깅용)
+                    actual_univ = meta.get("university", "[정보 없음]")
+                    actual_dept = meta.get("department", "[정보 없음]")
+                    actual_grade_sem = meta.get("grade_semester", "[정보 없음]")
+                    print(f"   ✅ [{semester_label}] Selected ({i+1}/{courses_per_semester}): {course_name}")
+                    print(f"      Source: {actual_univ} / {actual_dept} / {actual_grade_sem}")
 
-                # 실제 메타데이터 로깅 (디버깅용)
-                actual_univ = meta.get("university", "[정보 없음]")
-                actual_dept = meta.get("department", "[정보 없음]")
-                actual_grade_sem = meta.get("grade_semester", "[정보 없음]")
-                print(f"   ✅ [{semester_label}] Selected: {course_name}")
-                print(f"      Source: {actual_univ} / {actual_dept} / {actual_grade_sem}")
+                    selected_courses.append({
+                        "name": course_name,
+                        "classification": meta.get("course_classification", "[정보 없음]"),
+                        "description": doc.page_content
+                    })
+
+                    # 원하는 개수만큼 선택했으면 중단
+                    if len(selected_courses) >= courses_per_semester:
+                        break
 
                 curriculum.append({
                     "semester": semester_label,
-                    "course": {
-                        "name": course_name,
-                        "classification": meta.get("course_classification", "[정보 없음]"),
-                        "description": best_doc.page_content
-                    },
-                    "reason": reason
+                    "courses": selected_courses,
+                    "count": len(selected_courses)
                 })
 
             except Exception as e:
                 print(f"Error retrieving courses for {semester_label}: {e}")
                 curriculum.append({
                     "semester": semester_label,
-                    "course": None,
-                    "reason": f"검색 중 오류 발생: {str(e)}"
+                    "courses": [],
+                    "count": 0,
+                    "message": f"검색 중 오류 발생: {str(e)}"
                 })
 
     # 커리큘럼 전체가 비어있거나 모든 항목이 오류인 경우 예외처리
-    valid_items = [item for item in curriculum if item.get("course") is not None]
+    valid_items = [item for item in curriculum if item.get("count", 0) > 0]
     if not valid_items:
         print(f"⚠️  WARNING: No valid curriculum generated for {university} {department}")
         return [{
@@ -487,7 +546,8 @@ def recommend_curriculum(
             "details": f"대학: {university}, 학과: {department}에 대한 커리큘럼을 찾을 수 없습니다."
         }]
 
-    print(f"✅ Generated curriculum with {len(curriculum)} semesters ({len(valid_items)} valid)")
+    total_courses = sum(item.get("count", 0) for item in curriculum)
+    print(f"✅ Generated curriculum with {len(curriculum)} semesters ({total_courses} total courses)")
 
     return curriculum
 
@@ -497,33 +557,110 @@ def recommend_curriculum(
 @tool
 def match_department_name(department_query: str) -> dict:
     """
-    학과명을 임베딩 기반으로 표준 학과명으로 매핑한다.
-    ex) '컴공' → '컴퓨터공학과'
+    학과명을 임베딩 기반으로 표준 학과명으로 매핑합니다.
+
+    대학명과 학과명이 섞여 있는 경우 자동으로 분리하여 처리합니다.
+    대학명 정규화는 univ_mapping.json을 사용합니다.
+
+    Examples:
+        '컴공' → '컴퓨터공학과'
         '컴퓨터과' → '컴퓨터공학과'
-        '소프트웨어' → '소프트웨어학과'
+        '소프트웨어' → '소프트웨어학부'
+        '홍대 컴공' → university='홍익대학교', department='컴퓨터공학과'
+        '서울대 전전' → university='서울대학교', department='전자공학과'
+        '설대 컴공' → university='서울대학교', department='컴퓨터공학과' (은어 지원)
+
+    Args:
+        department_query: 학과명 또는 "대학명 + 학과명" 형태 (예: "컴공", "홍대 컴공")
+
+    Returns:
+        {
+            "input": "원본 쿼리",
+            "university": "추출된 대학명 (있는 경우)",
+            "matched_department": "매칭된 표준 학과명",
+            "similarity": "유사도 점수"
+        }
     """
+    from backend.rag.entity_extractor import normalize_university_name
+    import re
+
+    print(f"✅ Using match_department_name with query: '{department_query}'")
+
+    # 대학명 추출 시도
+    extracted_university = None
+    dept_only_query = department_query
+
+    # 1단계: 공백으로 분리하여 대학명 체크
+    tokens = department_query.split()
+    if len(tokens) >= 2:
+        first_token = tokens[0]
+
+        # entity_extractor의 normalize_university_name 사용
+        # 정규화 시도 (홍대 → 홍익대학교, 설대 → 서울대학교 등)
+        normalized = normalize_university_name(first_token)
+
+        # 정규화가 성공했는지 확인 (원본과 다르면 성공)
+        if normalized != first_token or normalized.endswith('대학교'):
+            extracted_university = normalized
+            # "대학교"로 끝나지 않으면 추가
+            if not extracted_university.endswith('대학교'):
+                extracted_university += '대학교'
+
+            dept_only_query = ' '.join(tokens[1:])  # 나머지를 학과명으로
+            print(f"   Extracted university: {extracted_university} (from '{first_token}')")
+            print(f"   Department query: {dept_only_query}")
+
+    # 2단계: 공백 없이 붙어있는 경우 처리 (예: "홍대컴공")
+    # 정규식으로 대학명 패턴 찾기
+    if not extracted_university:
+        # "~대학교", "~대" 패턴 찾기
+        univ_pattern = r'^([가-힣]+대학교|[가-힣]+대)'
+        univ_match = re.match(univ_pattern, department_query)
+
+        if univ_match:
+            univ_token = univ_match.group(1)
+            normalized = normalize_university_name(univ_token)
+
+            if normalized != univ_token or normalized.endswith('대학교'):
+                extracted_university = normalized
+                if not extracted_university.endswith('대학교'):
+                    extracted_university += '대학교'
+
+                # 대학명 부분을 제거한 나머지를 학과명으로
+                dept_only_query = department_query[len(univ_match.group(0)):].strip()
+                print(f"   Extracted university: {extracted_university} (from '{univ_token}')")
+                print(f"   Department query: {dept_only_query}")
+
     embeddings = get_embeddings()
 
-    # 1) 캐시된 학과명 + 임베딩 불러오기 (한 번만 계산)
+    # 1) 캐시된 학과명 + 임베딩 불러오기
     departments, dept_matrix = _load_department_embeddings()
 
-    # 2) 쿼리 임베딩만 새로 계산 (1회 호출)
-    query_vec = np.array(embeddings.embed_query(department_query))
+    # 2) 학과명만 임베딩하여 매칭
+    query_vec = np.array(embeddings.embed_query(dept_only_query))
 
-    # 3) 전체 학과와의 코사인 유사도 한 번에 계산
-    #    (벡터 연산으로 처리 → 파이썬 for-loop 최소화)
+    # 3) 전체 학과와의 코사인 유사도 계산
     norms = np.linalg.norm(dept_matrix, axis=1) * np.linalg.norm(query_vec)
+    # 0으로 나누는 것 방지
+    norms = np.where(norms == 0, 1e-10, norms)
     sims = (dept_matrix @ query_vec) / norms
 
     best_idx = int(np.argmax(sims))
     best_match = departments[best_idx]
     best_score = float(sims[best_idx])
 
-    return {
+    print(f"   Best match: {best_match} (similarity: {best_score:.3f})")
+
+    result = {
         "input": department_query,
         "matched_department": best_match,
         "similarity": best_score,
     }
+
+    if extracted_university:
+        result["university"] = extracted_university
+
+    return result
   
 @tool
 def get_search_help() -> str:

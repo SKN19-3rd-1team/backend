@@ -54,6 +54,14 @@ if "messages" not in st.session_state:
 if "interests" not in st.session_state:
     st.session_state.interests = ""
 
+# 대단위 카테고리 선택 초기화
+if "selected_main_categories" not in st.session_state:
+    st.session_state.selected_main_categories = []
+
+# 세부 체크리스트 선택 초기화
+if "selected_subcategories" not in st.session_state:
+    st.session_state.selected_subcategories = {}
+
 if "button_prompt" not in st.session_state:
     st.session_state.button_prompt = None
 if 'format_pending' not in st.session_state:
@@ -61,6 +69,59 @@ if 'format_pending' not in st.session_state:
     
 st.title("🎓 전공 탐색 멘토 챗봇")
 st.write("이공계열 과목들을 기반으로, 나에게 맞는 과목과 진로를 함께 고민해보는 멘토 챗봇입니다.")
+
+# ==================== 카테고리 데이터 정의 ====================
+MAIN_CATEGORIES = {
+    "공학": ["컴퓨터 / 소프트웨어 / 인공지능", "전기 / 전자 / 반도체", "기계 / 자동차 / 로봇",
+             "화학 / 화공 / 신소재", "산업공학 / 시스템 / 데이터분석", "건축 / 토목 / 도시",
+             "에너지 / 환경 / 원자력"],
+    "자연과학": ["수학 / 통계", "물리 / 천문", "화학", "생명과학 / 바이오", "지구과학 / 환경"],
+    "의약·보건": ["의대 / 치대 / 한의대", "약학", "간호", "보건행정 / 보건정책",
+                "재활 / 물리치료 / 작업치료 등"],
+    "경영·경제·회계": ["경영(마케팅, 인사, 전략 등)", "경제 / 금융 / 금융공학", "회계 / 세무"],
+    "사회과학": ["행정 / 정책", "정치 / 외교 / 국제관계", "사회 / 사회복지",
+                "심리 / 상담", "언론 / 미디어 / 광고 / PR"],
+    "인문": ["국어 / 문학", "영어 / 외국어", "역사 / 고고학", "철학 / 인류학 / 종교학"],
+    "교육": ["교육학 / 교과교육(국영수 등)", "유아교육 / 특수교육"],
+    "예체능": ["미술 / 회화 / 조소", "디자인(시각, 산업, UX/UI 등)",
+             "음악 / 작곡 / 연주 / 보컬", "연극 / 영화 / 공연예술", "체육 / 스포츠 / 운동재활"],
+    "융합/신산업": ["데이터사이언스 / 빅데이터", "인공지능 / 로봇 / 자율주행",
+                  "게임 / 인터랙티브콘텐츠", "영상 / 콘텐츠 / 유튜브 / 방송",
+                  "문화기획 / 이벤트 / 전시", "스타트업 / 창업"]
+}
+
+# 선택된 카테고리를 텍스트로 포맷팅하는 함수
+def format_interests_from_selection():
+    """선택된 대단위 카테고리와 세부 항목을 구조화된 텍스트로 변환 (UI 표시용)"""
+    if not st.session_state.selected_main_categories:
+        return ""
+
+    interests_parts = []
+    for main_cat in st.session_state.selected_main_categories:
+        subcats = st.session_state.selected_subcategories.get(main_cat, [])
+        if subcats:
+            interests_parts.append(f"{main_cat}: {', '.join(subcats)}")
+        else:
+            interests_parts.append(main_cat)
+
+    return " | ".join(interests_parts)
+
+def format_interests_for_llm():
+    """세부 관심사만 추출하여 LLM이 파싱하기 쉬운 형태로 변환"""
+    if not st.session_state.selected_main_categories:
+        return ""
+
+    all_subcats = []
+    for main_cat in st.session_state.selected_main_categories:
+        subcats = st.session_state.selected_subcategories.get(main_cat, [])
+        if subcats:
+            all_subcats.extend(subcats)
+        else:
+            # 세부 항목이 없으면 대단위 카테고리를 사용
+            all_subcats.append(main_cat)
+
+    # 쉼표로 구분된 리스트 형태로 반환
+    return ", ".join(all_subcats)
 
 # 커리큘럼 키워드 감지 함수
 def is_curriculum_query(text: str) -> bool:
@@ -90,22 +151,79 @@ def handle_button_click(selection: str):
 with st.sidebar:
     st.header("나에 대한 정보")
 
-    # 관심사 입력 영역
-    interests = st.text_area(
-        "관심사 / 진로 방향 (선택)",
-        value=st.session_state.interests,
+    # ==================== 1. 대단위 카테고리 선택 (최대 2개) ====================
+    st.subheader("1️⃣ 관심 분야 선택 (최대 2개)")
+    st.caption("아래 분야에서 관심 있는 분야를 2개까지 선택해주세요.")
+
+    selected_main = []
+    for category in MAIN_CATEGORIES.keys():
+        if st.checkbox(
+            category,
+            value=(category in st.session_state.selected_main_categories),
+            key=f"main_{category}",
+            disabled=(len(st.session_state.selected_main_categories) >= 2 and
+                     category not in st.session_state.selected_main_categories)
+        ):
+            selected_main.append(category)
+
+    st.session_state.selected_main_categories = selected_main
+
+    # ==================== 2. 세부 체크리스트 ====================
+    if st.session_state.selected_main_categories:
+        st.divider()
+        st.subheader("2️⃣ 세부 관심 분야 선택")
+        st.caption("선택한 분야에서 구체적으로 끌리는 키워드를 골라주세요.")
+
+        for main_cat in st.session_state.selected_main_categories:
+            with st.expander(f"📌 {main_cat}", expanded=True):
+                subcategories = MAIN_CATEGORIES[main_cat]
+                selected_subs = []
+
+                for subcat in subcategories:
+                    if st.checkbox(
+                        subcat,
+                        value=(subcat in st.session_state.selected_subcategories.get(main_cat, [])),
+                        key=f"sub_{main_cat}_{subcat}"
+                    ):
+                        selected_subs.append(subcat)
+
+                st.session_state.selected_subcategories[main_cat] = selected_subs
+
+    # ==================== 선택 결과 미리보기 ====================
+    formatted_interests = format_interests_from_selection()
+    if formatted_interests:
+        st.divider()
+        st.subheader("✅ 선택한 관심사")
+        st.info(formatted_interests)
+        # interests 필드 자동 업데이트
+        st.session_state.interests = formatted_interests
+
+    # ==================== 추가 관심사 입력 (선택) ====================
+    st.divider()
+    st.subheader("💬 추가 관심사 (선택)")
+    additional_interests = st.text_area(
+        "자유롭게 입력",
+        value="" if formatted_interests else st.session_state.interests,
         placeholder="예: AI, 데이터 분석, 스타트업, 백엔드, 보안 등",
-        key="interests_input"
+        key="additional_interests_input",
+        height=80
     )
-    # Session State 업데이트 (입력값 저장)
-    st.session_state.interests = interests
+
+    # 추가 관심사가 있으면 기존 선택과 결합
+    if additional_interests and formatted_interests:
+        st.session_state.interests = f"{formatted_interests} | {additional_interests}"
+    elif additional_interests:
+        st.session_state.interests = additional_interests
+    elif formatted_interests:
+        st.session_state.interests = formatted_interests
 
     # 대화 기록 초기화 버튼
+    st.divider()
     if st.button("🗑️ 대화 기록 초기화"):
         st.session_state.messages = []
         st.session_state.button_prompt = None
         st.session_state.format_pending = False
-        st.stop()
+        st.rerun()
 
 
 # ==================== 채팅 기록 표시 ====================
@@ -170,9 +288,12 @@ if prompt:
             if st.session_state.get('internal_marker'):
                 run_question = f"{prompt} {st.session_state.get('internal_marker')}"
 
-            raw_response: str | dict = run_mentor( 
+            # LLM이 파싱하기 쉬운 형태로 관심사 전달 (세부 항목만)
+            llm_interests = format_interests_for_llm() or st.session_state.interests
+
+            raw_response: str | dict = run_mentor(
                 question=run_question,
-                interests=st.session_state.interests or None,
+                interests=llm_interests or None,
                 chat_history=st.session_state.messages
             )
 
