@@ -95,7 +95,7 @@ def get_llm():
             return ChatOpenAI(model=settings.model_name)
 
     elif provider == "ollama":
-        # 로컬 Ollama 서버 사용
+        # 로컬 또는 원격 Ollama 서버 사용
         # 예: MODEL_NAME=llama3.2:1b, qwen2.5:7b-instruct 등
         try:
             # 최신 langchain_ollama 패키지 사용 시도
@@ -104,10 +104,15 @@ def get_llm():
             # 폴백: 구버전 langchain_community 사용
             from langchain_community.chat_models import ChatOllama
 
+        # OLLAMA_BASE_URL 환경 변수로 원격 서버 지정 가능
+        # 로컬: http://localhost:11434 (기본값)
+        # RunPod: http://YOUR_RUNPOD_IP:11434
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
         return ChatOllama(
             model=settings.model_name,
             temperature=0.7,  # 창의성 조절 (0.0 = 결정적, 1.0 = 창의적)
-            # base_url="http://localhost:11434",  # Ollama 기본 주소, 필요시 변경 가능
+            base_url=base_url,  # .env의 OLLAMA_BASE_URL 또는 기본값
         )
 
     elif provider == "huggingface":
