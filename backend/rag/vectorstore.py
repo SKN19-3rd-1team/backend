@@ -25,6 +25,11 @@ from langchain_community.vectorstores import Chroma
 from backend.config import get_settings, resolve_path, expand_paths
 from .embeddings import get_embeddings
 
+# 벡터 스토어 싱글톤 캐시
+# 여러 툴이 동시에 호출될 때 Chroma 인스턴스를 중복 생성하지 않도록 전역 변수에 캐싱
+# ChromaDB 1.3.4의 재초기화 버그를 방지하기 위해 한 번만 로드하고 재사용
+_VECTORSTORE_CACHE = None
+
 
 def _resolve_persist_dir(persist_directory: Path | str | None) -> Path:
     """
@@ -102,10 +107,13 @@ def build_vectorstore(
 
 def load_vectorstore(persist_directory: Path | str | None = None):
     """
-    디스크에 저장된 Chroma Vector DB 로드
+    디스크에 저장된 Chroma Vector DB 로드 (싱글톤 패턴)
 
     build_vectorstore()로 생성한 Vector DB를 메모리에 로드합니다.
     실제 검색 시에는 이 함수를 사용합니다 (빠름).
+
+    한 번 로드된 Vector Store는 전역 캐시에 저장되어 재사용됩니다.
+    이는 ChromaDB 1.3.4의 재초기화 버그를 방지하고 성능을 향상시킵니다.
 
     ** 주의사항 **
     - build_vectorstore()와 같은 임베딩 모델을 사용해야 함
@@ -118,6 +126,13 @@ def load_vectorstore(persist_directory: Path | str | None = None):
     Returns:
         Chroma: 로드된 Vector Store 인스턴스 (검색 가능 상태)
     """
+    global _VECTORSTORE_CACHE
+
+    # 이미 로드된 인스턴스가 있으면 재사용 (싱글톤 패턴)
+    # 여러 툴이 호출되어도 Vector Store는 한 번만 로딩됨
+    if _VECTORSTORE_CACHE is not None:
+        return _VECTORSTORE_CACHE
+
     # 저장 디렉토리 경로 해석
     persist_directory = _resolve_persist_dir(persist_directory)
 
@@ -127,10 +142,12 @@ def load_vectorstore(persist_directory: Path | str | None = None):
     # 디스크에서 Chroma DB 로드
     # - persist_directory의 SQLite 파일과 벡터 데이터 읽기
     # - embedding_function으로 새 쿼리를 임베딩하여 검색
-    return Chroma(
+    _VECTORSTORE_CACHE = Chroma(
         embedding_function=embeddings,
         persist_directory=str(persist_directory),
     )
+
+    return _VECTORSTORE_CACHE
 
 
 if __name__ == "__main__":
@@ -170,12 +187,12 @@ if __name__ == "__main__":
 
     # 빌드 시작
     print(
-        f"\n🚀 Building vector store with {len(docs)} documents "
+        f"\nBuilding vector store with {len(docs)} documents "
         f"at '{target_dir}'..."
     )
-    print("⏳ This may take a few minutes depending on the number of documents and embedding model speed...\n")
+    print("This may take a few minutes depending on the number of documents and embedding model speed...\n")
 
     build_vectorstore(docs, persist_directory=target_dir)
 
-    print("\n✅ Vector store build complete!")
-    print(f"📂 Saved to: {target_dir}")
+    print("\nVector store build complete!")
+    print(f"Saved to: {target_dir}")
