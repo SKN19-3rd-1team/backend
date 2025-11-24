@@ -119,6 +119,65 @@ def validate_and_fix_department_names(
 
     return llm_response, violations
 
+
+def strict_validate_and_fix_department_names(
+    llm_response: str,
+    valid_departments: Set[str]
+) -> tuple[str, List[dict]]:
+    """
+    validate_and_fix_department_names를 보다 엄격하게 확장한 버전.
+
+    - list_departments Tool 결과에 없는 학과명은 가능한 경우 가장 가까운
+      학과명으로 교체하고, 그렇지 않으면 응답에서 제거한다.
+    """
+    if not valid_departments:
+        return llm_response, []
+
+    pattern = r'\*\*([^*]+)\*\*'
+    mentioned_depts = re.findall(pattern, llm_response)
+
+    violations: List[dict] = []
+
+    for dept in mentioned_depts:
+        # Tool 결과에 그대로 존재하면 유지
+        if dept in valid_departments:
+            continue
+
+        best_match = None
+        best_score = 0.0
+
+        # 부분 문자열 조건 없이 전체 후보를 대상으로 유사도 계산
+        for valid_dept in valid_departments:
+            overlap = len(set(dept) & set(valid_dept))
+            score = overlap / max(len(dept), len(valid_dept))
+            if score > best_score:
+                best_score = score
+                best_match = valid_dept
+
+        if best_match and best_score > 0.5:
+            # 충분히 비슷하면 Tool 학과명으로 교체
+            violations.append({
+                "wrong": dept,
+                "correct": best_match,
+                "action": "replace_strict",
+                "score": best_score,
+            })
+            llm_response = llm_response.replace(
+                f"**{dept}**",
+                f"**{best_match}**",
+            )
+        else:
+            # 교정 불가능하면 답변에서 제거
+            violations.append({
+                "wrong": dept,
+                "correct": None,
+                "action": "remove",
+                "score": best_score,
+            })
+            llm_response = llm_response.replace(f"**{dept}**", dept)
+
+    return llm_response, violations
+
 # ==================== ReAct 에이전트용 설정 ====================
 # ReAct 패턴: LLM이 필요시 자율적으로 툴을 호출할 수 있도록 설정
 tools = [
@@ -614,7 +673,7 @@ get_universities_by_department를 사용하세요!
             print(f"\n🔍 [Validation] Checking department names... (Valid: {len(valid_departments)})")
 
             # 학과명 검증 및 수정
-            corrected_content, violations = validate_and_fix_department_names(
+            corrected_content, violations = strict_validate_and_fix_department_names(
                 response.content,
                 valid_departments
             )
