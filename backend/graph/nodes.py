@@ -74,20 +74,9 @@ def retrieve_node(state: MentorState) -> dict:
         metadata_filter=chroma_filter
     )
 
-    # 3. 필터가 너무 제한적이어서 결과가 없으면, 필터 없이 재검색
+    # 3. 필터 적용 여부 기록 (폴백 로직은 제거됨 - 엄격한 필터링 유지)
     filter_applied = chroma_filter is not None
     filter_relaxed = False
-    if filter_applied and not docs:
-        print(
-            "Warning: metadata filter returned no documents "
-            f"({chroma_filter}). Falling back to unfiltered retrieval."
-        )
-        docs = retrieve_with_filter(
-            question=question,
-            search_k=search_k,
-            metadata_filter=None
-        )
-        filter_relaxed = True
 
     # 4. 검색된 Document를 구조화된 course_candidates로 변환
     course_candidates = []
