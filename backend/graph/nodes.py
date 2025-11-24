@@ -17,12 +17,8 @@ from pydantic import BaseModel, Field
 from .state import MentorState
 from backend.rag.retriever import retrieve_with_filter
 from backend.rag.entity_extractor import extract_filters, build_chroma_filter
-from backend.rag.tools import (
-    retrieve_courses,
-    list_departments,
-    recommend_curriculum,
-    match_department_name,  # ✅ 다시 포함
-)
+
+from backend.rag.tools import retrieve_courses, list_departments, recommend_curriculum, get_search_help, match_department_name
 
 from backend.config import get_llm
 
@@ -31,12 +27,7 @@ llm = get_llm()
 
 # ==================== ReAct 에이전트용 설정 ====================
 # ReAct 패턴: LLM이 필요시 자율적으로 툴을 호출할 수 있도록 설정
-tools = [
-    retrieve_courses,
-    list_departments,
-    recommend_curriculum,
-    match_department_name,  # ✅ tools 바인딩에 포함
-]
+tools = [retrieve_courses, list_departments, recommend_curriculum, get_search_help, match_department_name]  # 사용 가능한 툴 목록
 llm_with_tools = llm.bind_tools(tools)  # LLM에 툴 사용 권한 부여
 
 
@@ -74,19 +65,9 @@ def retrieve_node(state: MentorState) -> dict:
         metadata_filter=chroma_filter
     )
 
+    # 3. 필터 적용 여부 기록 (폴백 로직은 제거됨 - 엄격한 필터링 유지)
     filter_applied = chroma_filter is not None
     filter_relaxed = False
-    if filter_applied and not docs:
-        print(
-            "Warning: metadata filter returned no documents "
-            f"({chroma_filter}). Falling back to unfiltered retrieval."
-        )
-        docs = retrieve_with_filter(
-            question=question,
-            search_k=search_k,
-            metadata_filter=None
-        )
-        filter_relaxed = True
 
     course_candidates = []
     for idx, doc in enumerate(docs):
@@ -245,7 +226,6 @@ def agent_node(state: MentorState) -> dict:
 
     # system_message는 interests 유무와 상관없이 항상 만들어둔다.
     if not messages or not any(isinstance(m, SystemMessage) for m in messages):
-
         interests_text = f"{interests}" if interests else "없음"
 
         # ✅ f-string 내부 JSON 예시는 {{ }} 로 이스케이프!
@@ -315,11 +295,63 @@ def agent_node(state: MentorState) -> dict:
 - Tool이 필요하면 tool_calls 포함
 - 필요 없으면 자연어로만 답변
 - 항상 한국어로 답변
-""")
 
-        messages = [system_message] + messages
+      
+──────────────────────────────────────────
+**[ 특별 지침 (커리큘럼 추천 시) ]**
+- 학생의 현재 질문에 **'표 형태로', '요약형으로', '상세형으로'와 같은 출력 형식 요청**이 포함되어 있다면,
+- 이전 대화 기록에서 이미 recommend_curriculum 툴 호출 결과가 포함되었는지 확인하세요.
+- 데이터가 확보되었다면 툴을 다시 호출하거나 출력 형식 선택지를 다시 제시하지 말고,
+- 기존 데이터를 활용하여 요청된 형식에 맞춰 즉시 최종 답변을 생성하고 종료하세요.
+- 대화 기록에 있는 형식 선택 유도 메시지는 무시하고 최종 답변 생성에만 집중하세요.
+"""
+    )
+                                       
+    messages = [system_message] + messages
 
     response = llm_with_tools.invoke(messages)
+
+
+    # 3. 검증: 첫 번째 사용자 질문에 대해 툴을 호출하지 않았는지 확인
+    # ToolMessage가 없다는 것은 아직 툴 결과를 받지 않았다는 의미
+    from langchain_core.messages import ToolMessage
+    has_tool_results = any(isinstance(m, ToolMessage) for m in messages)
+
+    # 툴 결과가 없는 상태에서 LLM이 tool_calls 없이 답변하려고 하면 차단
+    if not has_tool_results:
+        if not hasattr(response, "tool_calls") or not response.tool_calls:
+            print("⚠️ WARNING: LLM attempted to answer without using tools. Forcing tool usage.")
+            # 강제로 재시도 메시지 추가
+            error_message = HumanMessage(content=(
+                "❌ 오류: 당신은 툴을 사용하지 않고 답변하려고 했습니다.\n"
+                "**반드시 먼저 적절한 툴을 호출해야 합니다.**\n\n"
+                "다시 한 번 강조합니다:\n"
+                "1. retrieve_courses: 과목 검색\n"
+                "2. list_departments: 학과 목록\n"
+                "3. recommend_curriculum: 커리큘럼 추천\n\n"
+                "학생의 원래 질문을 다시 읽고, 적절한 툴을 **지금 즉시** 호출하세요."
+            ))
+            messages.append(error_message)
+
+            # 재시도
+            response = llm_with_tools.invoke(messages)
+
+            # 재시도에도 툴을 사용하지 않으면 get_search_help로 폴백
+            if not hasattr(response, "tool_calls") or not response.tool_calls:
+                print("⚠️ CRITICAL: LLM still refuses to use tools. Falling back to get_search_help.")
+                from langchain_core.messages import AIMessage
+                # 강제로 get_search_help 툴 호출 생성
+                response = AIMessage(
+                    content="",
+                    tool_calls=[{
+                        "name": "get_search_help",
+                        "args": {},
+                        "id": "forced_search_help"
+                    }]
+                )
+
+    # 4. LLM의 응답(response)을 messages에 추가하여 상태 업데이트
+    #    → should_continue가 tool_calls 유무를 확인하여 다음 노드 결정
     return {"messages": [response]}
 
 
