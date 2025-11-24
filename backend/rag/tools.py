@@ -378,8 +378,7 @@ def recommend_curriculum(
                 docs = retrieve_with_filter(
                     question=interests if interests else "추천 과목",
                     search_k=10,  # 후보 많이 가져오기
-                    metadata_filter=chroma_filter,
-                    warn_on_fallback=True  # Fallback 경고 활성화
+                    metadata_filter=chroma_filter
                 )
 
                 if not docs:
