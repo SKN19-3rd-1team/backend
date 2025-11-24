@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from .state import MentorState
 from backend.rag.retriever import retrieve_with_filter
 from backend.rag.entity_extractor import extract_filters, build_chroma_filter
-from backend.rag.tools import retrieve_courses, list_departments, recommend_curriculum
+from backend.rag.tools import retrieve_courses, list_departments, recommend_curriculum, get_search_help
 
 from backend.config import get_llm
 
@@ -26,7 +26,7 @@ llm = get_llm()
 
 # ==================== ReAct 에이전트용 설정 ====================
 # ReAct 패턴: LLM이 필요시 자율적으로 툴을 호출할 수 있도록 설정
-tools = [retrieve_courses, list_departments, recommend_curriculum]  # 사용 가능한 툴 목록
+tools = [retrieve_courses, list_departments, recommend_curriculum, get_search_help]  # 사용 가능한 툴 목록
 llm_with_tools = llm.bind_tools(tools)  # LLM에 툴 사용 권한 부여
 
 # ==================== Structured 패턴용 Pydantic 모델 ====================
@@ -323,13 +323,33 @@ def agent_node(state: MentorState) -> dict:
             "학생들의 질문에 **반드시 한국어로** 답변하세요."
             f"{interests_info}\n"
             "**사용 가능한 툴:**\n"
-            "1. retrieve_courses: 특정 과목을 검색할 때 사용 (예: '인공지능 과목 추천해줘')\n"
-            "2. list_departments: 학과 목록을 조회할 때 사용 (예: '컴퓨터 관련 학과가 뭐가 있어?')\n"
-            "3. recommend_curriculum: 학기별 커리큘럼을 추천할 때 사용 (예: '2학년부터 4학년까지 커리큘럼 추천해줘')\n\n"
-            "**중요 지침:**\n"
-            "1. 학생이 '학과가 뭐가 있어?', '어떤 학과 있어?', '전공 종류' 같은 질문을 하면 list_departments 툴을 사용하세요.\n"
-            "2. 학생이 특정 과목 추천을 요청하면, retrieve_courses 툴로 관련 과목을 검색하세요.\n"
-            "3. 학생이 '2학년부터 4학년까지', '전체 커리큘럼', '학기별로' 같은 표현을 사용하면 recommend_curriculum 툴을 사용하세요.\n"
+            "1. retrieve_courses [최우선]: 대학/학과/과목에 대한 모든 질문에 사용\n"
+            "   - 예시: '홍익대학교 컴퓨터공학', '인공지능 과목 추천해줘', '서울대 전자공학과'\n"
+            "   - 대학명이나 학과명이 언급되면 무조건 이 툴을 사용하세요!\n"
+            "\n"
+            "2. recommend_curriculum: 학기별 커리큘럼을 추천할 때 사용\n"
+            "   - 예시: '2학년부터 4학년까지 커리큘럼 추천해줘', '전체 커리큘럼'\n"
+            "\n"
+            "3. list_departments [제한적]: 학과 목록만 조회할 때 사용 (과목 정보 X)\n"
+            "   - 예시: '어떤 학과들이 있어?', '컴퓨터 관련 학과 목록'\n"
+            "   - ⚠️ 특정 대학/학과가 언급되면 retrieve_courses를 대신 사용하세요\n"
+            "\n"
+            "4. get_search_help: 검색 결과가 없거나 정보를 가져올 수 없을 때 사용\n\n"
+            "**절대적 규칙 (CRITICAL):**\n"
+            "⚠️ 학생의 질문에 답변하기 전에 **반드시** 적절한 툴을 먼저 호출해야 합니다.\n"
+            "⚠️ 당신의 사전 지식이나 학습된 정보로 **절대로** 직접 답변하지 마세요.\n"
+            "⚠️ 툴 호출 없이 답변을 작성하는 것은 **엄격히 금지**됩니다.\n"
+            "⚠️ 모든 답변은 반드시 툴에서 반환된 실제 데이터를 기반으로 작성되어야 합니다.\n\n"
+            "**중요 지침 (우선순위 순서):**\n"
+            "1. **[최우선]** 학생이 특정 대학명이나 학과명을 언급하면 **무조건 retrieve_courses** 툴을 사용하세요.\n"
+            "   - 예시: '홍익대학교 컴퓨터공학', '서울대 전자공학과', '컴퓨터공학 과목', '인공지능 수업'\n"
+            "   - 대학명 또는 학과명이 포함된 모든 질문은 retrieve_courses를 사용해야 합니다.\n"
+            "\n"
+            "2. 학생이 '2학년부터 4학년까지', '전체 커리큘럼', '학기별로' 같은 표현을 사용하면 recommend_curriculum 툴을 사용하세요.\n"
+            "\n"
+            "3. **[제한적 사용]** 학생이 명확히 '학과 목록', '어떤 학과들이 있어?', '전공 종류' 같이 **목록 조회**를 요청할 때만 list_departments 툴을 사용하세요.\n"
+            "   - ⚠️ 주의: 특정 대학/학과가 언급되면 list_departments가 아닌 retrieve_courses를 사용해야 합니다.\n"
+            "\n"
             f"4. recommend_curriculum 툴 호출 시, interests 파라미터에 '{interests}'를 반드시 전달하세요.\n"
             
             "**특별 지침 (커리큘럼 추천 시):**\n"
@@ -352,7 +372,45 @@ def agent_node(state: MentorState) -> dict:
     #    - tool이 필요없으면: response에 일반 텍스트만 포함
     response = llm_with_tools.invoke(messages)
 
-    # 3. LLM의 응답(response)을 messages에 추가하여 상태 업데이트
+    # 3. 검증: 첫 번째 사용자 질문에 대해 툴을 호출하지 않았는지 확인
+    # ToolMessage가 없다는 것은 아직 툴 결과를 받지 않았다는 의미
+    from langchain_core.messages import ToolMessage
+    has_tool_results = any(isinstance(m, ToolMessage) for m in messages)
+
+    # 툴 결과가 없는 상태에서 LLM이 tool_calls 없이 답변하려고 하면 차단
+    if not has_tool_results:
+        if not hasattr(response, "tool_calls") or not response.tool_calls:
+            print("⚠️ WARNING: LLM attempted to answer without using tools. Forcing tool usage.")
+            # 강제로 재시도 메시지 추가
+            error_message = HumanMessage(content=(
+                "❌ 오류: 당신은 툴을 사용하지 않고 답변하려고 했습니다.\n"
+                "**반드시 먼저 적절한 툴을 호출해야 합니다.**\n\n"
+                "다시 한 번 강조합니다:\n"
+                "1. retrieve_courses: 과목 검색\n"
+                "2. list_departments: 학과 목록\n"
+                "3. recommend_curriculum: 커리큘럼 추천\n\n"
+                "학생의 원래 질문을 다시 읽고, 적절한 툴을 **지금 즉시** 호출하세요."
+            ))
+            messages.append(error_message)
+
+            # 재시도
+            response = llm_with_tools.invoke(messages)
+
+            # 재시도에도 툴을 사용하지 않으면 get_search_help로 폴백
+            if not hasattr(response, "tool_calls") or not response.tool_calls:
+                print("⚠️ CRITICAL: LLM still refuses to use tools. Falling back to get_search_help.")
+                from langchain_core.messages import AIMessage
+                # 강제로 get_search_help 툴 호출 생성
+                response = AIMessage(
+                    content="",
+                    tool_calls=[{
+                        "name": "get_search_help",
+                        "args": {},
+                        "id": "forced_search_help"
+                    }]
+                )
+
+    # 4. LLM의 응답(response)을 messages에 추가하여 상태 업데이트
     #    → should_continue가 tool_calls 유무를 확인하여 다음 노드 결정
     return {"messages": [response]}
 
