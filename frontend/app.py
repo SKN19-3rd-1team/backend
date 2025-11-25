@@ -76,18 +76,17 @@ MAIN_CATEGORIES = {
              "화학 / 화공 / 신소재", "산업공학 / 시스템 / 데이터분석", "건축 / 토목 / 도시",
              "에너지 / 환경 / 원자력"],
     "자연과학": ["수학 / 통계", "물리 / 천문", "화학", "생명과학 / 바이오", "지구과학 / 환경"],
-    "의약·보건": ["의대 / 치대 / 한의대", "약학", "간호", "보건행정 / 보건정책",
-                "재활 / 물리치료 / 작업치료 등"],
+    "의약·보건": ["약학", "간호", "보건행정 / 보건정책"],
     "경영·경제·회계": ["경영(마케팅, 인사, 전략 등)", "경제 / 금융 / 금융공학", "회계 / 세무"],
     "사회과학": ["행정 / 정책", "정치 / 외교 / 국제관계", "사회 / 사회복지",
                 "심리 / 상담", "언론 / 미디어 / 광고 / PR"],
     "인문": ["국어 / 문학", "영어 / 외국어", "역사 / 고고학", "철학 / 인류학 / 종교학"],
     "교육": ["교육학 / 교과교육(국영수 등)", "유아교육 / 특수교육"],
     "예체능": ["미술 / 회화 / 조소", "디자인(시각, 산업, UX/UI 등)",
-             "음악 / 작곡 / 연주 / 보컬", "연극 / 영화 / 공연예술", "체육 / 스포츠 / 운동재활"],
+             "음악 / 작곡 / 연주 / 보컬", "체육 / 스포츠 / 운동재활"],
     "융합/신산업": ["데이터사이언스 / 빅데이터", "인공지능 / 로봇 / 자율주행",
                   "게임 / 인터랙티브콘텐츠", "영상 / 콘텐츠 / 유튜브 / 방송",
-                  "문화기획 / 이벤트 / 전시", "스타트업 / 창업"]
+                  "스타트업 / 창업"]
 }
 
 # 선택된 카테고리를 텍스트로 포맷팅하는 함수
@@ -156,17 +155,25 @@ with st.sidebar:
     st.caption("아래 분야에서 관심 있는 분야를 2개까지 선택해주세요.")
 
     selected_main = []
+    # 현재 선택된 항목 수를 먼저 계산
     for category in MAIN_CATEGORIES.keys():
-        if st.checkbox(
+        if category in st.session_state.selected_main_categories:
+            selected_main.append(category)
+
+    # 체크박스 렌더링 (현재 선택 수 기준으로 비활성화)
+    temp_selected = []
+    for category in MAIN_CATEGORIES.keys():
+        is_checked = st.checkbox(
             category,
             value=(category in st.session_state.selected_main_categories),
             key=f"main_{category}",
-            disabled=(len(st.session_state.selected_main_categories) >= 2 and
+            disabled=(len(selected_main) >= 2 and
                      category not in st.session_state.selected_main_categories)
-        ):
-            selected_main.append(category)
+        )
+        if is_checked:
+            temp_selected.append(category)
 
-    st.session_state.selected_main_categories = selected_main
+    st.session_state.selected_main_categories = temp_selected
 
     # ==================== 2. 세부 체크리스트 ====================
     if st.session_state.selected_main_categories:
@@ -217,12 +224,12 @@ with st.sidebar:
     elif formatted_interests:
         st.session_state.interests = formatted_interests
 
-    # 대화 기록 초기화 버튼
+    # 카테고리 초기화 버튼
     st.divider()
-    if st.button("🗑️ 대화 기록 초기화"):
-        st.session_state.messages = []
-        st.session_state.button_prompt = None
-        st.session_state.format_pending = False
+    if st.button("🔄 카테고리 초기화"):
+        st.session_state.selected_main_categories = []
+        st.session_state.selected_subcategories = {}
+        st.session_state.interests = ""
         st.rerun()
 
 
