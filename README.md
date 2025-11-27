@@ -45,7 +45,7 @@ major-mentor-bot/
 ├─ backend/
 │  ├─ data/
 │  │  ├─ raw/
-│  │  │  └─ *.json         # 원본 JSON
+│  │  │  └─ *.json                        # 원본 JSON
 │  │  └─ processed/
 │  │     └─ courses.parquet               # 전처리/캐시(optional)
 │  ├─ graph/
