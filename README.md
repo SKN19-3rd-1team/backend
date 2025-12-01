@@ -75,9 +75,9 @@ major-mentor-bot/
 
 ## 프로젝트 작동 방식
 
-이 프로젝트는 **두 가지 다른 RAG 패턴**을 지원합니다:
+이 프로젝트는 **두 가지 주요 워크플로우**를 지원합니다:
 
-### 1. ReAct 패턴 (기본값, Agentic)
+### 1. ReAct 패턴 (대화형 멘토링)
 
 **LLM이 자율적으로 tool 호출 여부를 결정하는 에이전트 방식**
 
@@ -92,81 +92,58 @@ major-mentor-bot/
 **작동 순서:**
 
 1. 사용자가 질문 입력 (예: "인공지능 관련 과목 추천해줘")
-2. `agent_node`: LLM이 질문을 분석하고 "과목 정보가 필요하다"고 판단
-3. LLM이 `retrieve_courses` tool 호출 결정 (tool_calls 포함하여 응답)
+2. `agent_node`: LLM이 질문을 분석하고 정보가 필요한지 판단
+3. LLM이 적절한 tool (`list_departments`, `get_universities_by_department` 등) 호출 결정
 4. `should_continue`: tool_calls 감지 → tools 노드로 라우팅
-5. `tools` 노드: `retrieve_courses` 함수 실행 → 벡터 DB에서 과목 검색
-6. `agent_node`로 복귀: LLM이 검색 결과 보고 최종 답변 생성
+5. `tools` 노드: 선택된 툴 실행 (학과 검색, 대학 찾기 등)
+6. `agent_node`로 복귀: LLM이 툴 결과를 바탕으로 답변 생성
 7. `should_continue`: tool_calls 없음 → 종료
 
 **핵심 파일:**
 
-- `backend/rag/tools.py`: `@tool` 데코레이터로 정의된 LangChain tool
+- `backend/rag/tools.py`: 학과 검색, 대학 조회, 진로 정보 조회 등의 툴 정의
 - `backend/graph/nodes.py`: `agent_node`, `should_continue`
 - `backend/graph/graph_builder.py`: `build_react_graph()`
 
-**장점:**
+### 2. Major Recommendation 패턴 (온보딩 추천)
 
-- LLM이 필요시에만 tool 호출 (효율적)
-- 여러 번 tool 호출 가능 (복잡한 질문 처리)
-- 진정한 Agentic 동작
-
-### 2. Structured 패턴 (고정 파이프라인)
-
-**미리 정해진 순서대로 실행되는 파이프라인 방식**
+**사용자의 온보딩 답변을 분석하여 전공을 추천하는 파이프라인**
 
 ```
-[사용자 질문] → retrieve_node → select_node → answer_node → [답변]
+[온보딩 답변] → recommend_majors_node → [추천 결과]
 ```
 
 **작동 순서:**
 
-1. `retrieve_node`: 벡터 DB에서 관련 과목 5개 검색
-2. `select_node`: LLM이 JSON 형식으로 적합한 과목 2-3개 선택
-3. `answer_node`: 선택된 과목만 사용하여 최종 답변 생성
+1. 사용자의 온보딩 답변(관심사, 과목, 희망 연봉 등) 수집
+2. `recommend_majors_node`: 답변을 텍스트 프로필로 변환 및 임베딩
+3. Vector Store(Pinecone)에서 관련 전공 검색
+4. 가중치를 적용하여 전공 점수 계산 및 상위 전공 추천
 
 **핵심 파일:**
 
-- `backend/graph/nodes.py`: `retrieve_node`, `select_node`, `answer_node`
-- `backend/graph/graph_builder.py`: `build_structured_graph()`
+- `backend/graph/nodes.py`: `recommend_majors_node`
+- `backend/graph/graph_builder.py`: `build_major_graph()`
 
-**장점:**
+### 실행 방법
 
-- Hallucination 방지 (선택된 과목만 LLM에게 제공)
-- 명확한 실행 순서 (디버깅 용이)
-- 예측 가능한 동작
-
-### 패턴 비교표
-
-| | **ReAct** | **Structured** |
-|---|---|---|
-| **Agentic** | ✅ 예 (LLM이 tool 호출 결정) | ❌ 아니오 (고정 순서) |
-| **실행 방식** | agent ⇄ tools (반복 가능) | retrieve → select → answer |
-| **tool 호출** | LLM이 자율 결정 | 무조건 실행 |
-| **유연성** | 높음 (복잡한 질문 처리) | 낮음 (단순 파이프라인) |
-| **Hallucination** | 가능성 있음 | 낮음 (선택된 과목만 제공) |
-| **현재 사용** | ✅ 기본값 | 옵션 |
-
-### 모드 변경 방법
-
-`backend/main.py`의 `run_mentor()` 함수에서 `mode` 파라미터로 변경:
+**대화형 멘토링 (ReAct):**
 
 ```python
-# ReAct 모드 (기본)
-answer = run_mentor("인공지능 과목 추천해줘")
+from backend.main import run_mentor
 
-# Structured 모드
-answer = run_mentor("인공지능 과목 추천해줘", mode="structured")
+answer = run_mentor("컴퓨터공학과가 있는 대학 알려줘")
 ```
 
-또는 `frontend/app.py`에서 직접 변경:
+**전공 추천 (Onboarding):**
 
 ```python
-response = run_mentor(
-    question=prompt,
-    interests=st.session_state.interests or None,
-    mode="structured"  # ← 여기를 변경
-)
+from backend.main import run_major_recommendation
+
+results = run_major_recommendation({
+    "interests": "코딩, 로봇",
+    "subjects": "수학, 과학"
+})
 ```
 
 ## 구성 설명
@@ -182,8 +159,25 @@ response = run_mentor(
   - `frontend/app.py`는 Streamlit UI를 제공하며 `backend.main.run_mentor`를 직접 호출해 답변을 보여줍니다.
 
 - **데이터 소스**
-  - <https://www.career.go.kr/cnet/front/openapi/openApiMajorCenter.do>
   - API에서 받아온 과목 정보를 JSON으로 저장 후 `RAW_JSON` 경로에 둡니다.
+
+### 전공 카테고리 데이터 관리
+
+이 프로젝트는 `backend/rag/tools.py`에서 사용하는 전공 카테고리 정보(`MAIN_CATEGORIES`)를 `backend/data/major_detail.json`에서 동적으로 추출하여 사용합니다.
+
+1. **카테고리 추출 스크립트**: `backend/rag/extract_categories.py`
+   - `major_detail.json`을 분석하여 전공명과 관련 학과들을 매핑합니다.
+   - 실행 결과는 `backend/data/major_categories.json`에 저장됩니다.
+
+2. **데이터 갱신 방법**:
+   - `major_detail.json` 데이터가 변경되면 아래 명령어로 카테고리 정보를 갱신해야 합니다.
+
+   ```bash
+   python backend/rag/extract_categories.py
+   ```
+
+3. **동적 로딩**:
+   - `backend/rag/tools.py`는 실행 시 `major_categories.json`을 로드하여 최신 카테고리 정보를 반영합니다.
 
 ## LLM/Embedding 모델 변경 방법
 
