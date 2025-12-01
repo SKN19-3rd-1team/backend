@@ -5,14 +5,12 @@ ReAct 스타일 에이전트를 위한 LangChain Tools 정의
 
 ** ReAct 패턴에서의 툴 역할 **
 LLM이 사용자 질문을 분석하고, 필요시 자율적으로 이 툴들을 호출하여 정보를 수집합니다.
-예: "홍익대 컴공 과목 알려줘" → LLM이 retrieve_courses 툴 호출 결정 → 과목 정보 검색 → 답변 생성
 
 ** 제공되는 툴들 **
-1. retrieve_courses: 과목 검색 (메인 툴, 가장 자주 사용됨)
-2. list_departments: 학과 목록 조회 (목록만 필요할 때)
-3. recommend_curriculum: 학기별 커리큘럼 추천 (여러 학기 계획)
+1. list_departments: 학과 목록 조회
+2. get_universities_by_department: 특정 학과가 있는 대학 조회
+3. get_major_career_info: 전공별 진출 직업/분야 조회
 4. get_search_help: 검색 실패 시 사용 가이드 제공
-5. get_course_detail: 특정 과목 상세 정보 (현재 미사용)
 
 ** 작동 방식 **
 1. LLM이 사용자 질문 분석
@@ -24,13 +22,23 @@ LLM이 사용자 질문을 분석하고, 필요시 자율적으로 이 툴들을
 
 from typing import List, Dict, Any, Optional
 from langchain_core.tools import tool
-from langchain_core.documents import Document
-import numpy as np
+import re
+import json
+from pathlib import Path
+from backend.config import get_settings
 
-from .retriever import retrieve_with_filter
-from .entity_extractor import extract_filters, build_chroma_filter
-from .vectorstore import load_vectorstore
-from .embeddings import get_embeddings
+from .vectorstore import get_major_vectorstore
+from .loader import load_major_detail
+
+
+def _log_tool_start(tool_name: str, description: str) -> None:
+    # 각 LangChain Tool이 어떤 목적을 가지는지 콘솔에 명확히 남긴다
+    print(f"[Tool:{tool_name}] 시작 - {description}")
+
+
+def _log_tool_result(tool_name: str, outcome: str) -> None:
+    # 툴 실행 결과(반환 건수, 상태 메시지 등)를 요약 출력
+    print(f"[Tool:{tool_name}] 결과 - {outcome}")
 
 
 def _get_tool_usage_guide() -> str:
@@ -40,68 +48,52 @@ def _get_tool_usage_guide() -> str:
     return """
 검색 가능한 방법들:
 
-1. **특정 과목 검색**
-   - 예시: "인공지능 관련 과목 추천해줘", "1학년 필수 과목 알려줘"
-   - 검색어에 과목명, 학년, 학기, 대학명 등을 포함할 수 있습니다
-
-2. **학과 목록 조회**
+1. **학과 목록 조회**
    - 예시: "어떤 학과들이 있어?", "컴퓨터 관련 학과 알려줘", "공대에는 어떤 학과가 있어?"
    - 전체 학과 목록 또는 키워드로 필터링된 학과를 확인할 수 있습니다
 
-3. **커리큘럼 추천**
-   - 예시: "홍익대 컴퓨터공학과 2학년부터 4학년까지 커리큘럼 추천해줘"
-   - 예시: "인공지능에 관심있는데 전체 커리큘럼 알려줘"
-   - 학기별로 맞춤 과목을 추천받을 수 있습니다
+2. **특정 학과가 있는 대학 조회**
+   - 예시: "컴퓨터공학과가 있는 대학 알려줘", "소프트웨어학부 개설 대학"
+   - 특정 학과를 개설한 대학 목록을 확인할 수 있습니다
+
+3. **전공별 진출 직업/분야 조회**
+   - 예시: "컴공 졸업하면 어떤 직업?", "OO학과 진로 알려줘"
+   - get_major_career_info 툴을 호출하여 major_detail.json의 `job`/`enter_field` 데이터를 그대로 확인할 수 있습니다
 
 더 구체적인 질문을 해주시면 더 정확한 정보를 제공해드릴 수 있습니다!
 """
 
-# 학과 임베딩 캐싱 함수
-_DEPT_EMBEDDINGS_CACHE = None
-_DEPT_NAMES_CACHE = None
 
-def _load_department_embeddings():
-    global _DEPT_EMBEDDINGS_CACHE, _DEPT_NAMES_CACHE
-    if _DEPT_EMBEDDINGS_CACHE is not None:
-        return _DEPT_NAMES_CACHE, _DEPT_EMBEDDINGS_CACHE
-
-    vs = load_vectorstore()
-    embeddings = get_embeddings()
-
-    collection = vs._collection
-    results = collection.get(include=["metadatas"])
-
-    departments = sorted({meta["department"]
-                          for meta in results["metadatas"]
-                          if meta.get("department")})
-
-    # 🔹 한 번에 배치 임베딩 (OpenAI는 내부에서 알아서 배치 처리)
-    dept_vecs = embeddings.embed_documents(departments)
-
-    _DEPT_NAMES_CACHE = departments
-    _DEPT_EMBEDDINGS_CACHE = np.array(dept_vecs)
-    return _DEPT_NAMES_CACHE, _DEPT_EMBEDDINGS_CACHE
+def _strip_html(value: str) -> str:
+    return re.sub(r"<[^>]+>", " ", value or "")
 
 # ===== 전공 대분류/세부분류 카테고리 =====
-MAIN_CATEGORIES = {
-    "공학": ["컴퓨터 / 소프트웨어 / 인공지능", "전기 / 전자 / 반도체", "기계 / 자동차 / 로봇",
-             "화학 / 화공 / 신소재", "산업공학 / 시스템 / 데이터분석", "건축 / 토목 / 도시",
-             "에너지 / 환경 / 원자력"],
-    "자연과학": ["수학 / 통계", "물리 / 천문", "화학", "생명과학 / 바이오", "지구과학 / 환경"],
-    "의약·보건": ["약학", "간호", "보건행정 / 보건정책"],
-    "경영·경제·회계": ["경영(마케팅, 인사, 전략 등)", "경제 / 금융 / 금융공학", "회계 / 세무"],
-    "사회과학": ["행정 / 정책", "정치 / 외교 / 국제관계", "사회 / 사회복지",
-                "심리 / 상담", "언론 / 미디어 / 광고 / PR"],
-    "인문": ["국어 / 문학", "영어 / 외국어", "역사 / 고고학", "철학 / 인류학 / 종교학"],
-    "교육": ["교육학 / 교과교육(국영수 등)", "유아교육 / 특수교육"],
-    "예체능": ["미술 / 회화 / 조소", "디자인(시각, 산업, UX/UI 등)",
-             "음악 / 작곡 / 연주 / 보컬", "체육 / 스포츠 / 운동재활"],
-    "융합/신산업": ["데이터사이언스 / 빅데이터", "인공지능 / 로봇 / 자율주행",
-                  "게임 / 인터랙티브콘텐츠", "영상 / 콘텐츠 / 유튜브 / 방송",
-                  "스타트업 / 창업"]
-}
+# ===== 전공 대분류/세부분류 카테고리 =====
+def _load_major_categories() -> dict[str, list[str]]:
+    """
+    backend/data/major_categories.json 파일에서 전공 분류 정보를 로드합니다.
+    """
+    try:
+        settings = get_settings()
+        # Assuming major_categories.json is in the same directory as major_detail.json
+        # or we can construct the path relative to this file or project root.
+        # Let's try to use a fixed path or derive it.
+        # Since we just created it in backend/data/major_categories.json:
+        json_path = Path("/home/maroco/major_mentor/backend/data/major_categories.json")
+        if not json_path.exists():
+             # Fallback or try relative path if absolute fails in different envs (though we are in a specific env)
+             base_dir = Path(__file__).parent.parent / "data"
+             json_path = base_dir / "major_categories.json"
+        
+        if json_path.exists():
+            return json.loads(json_path.read_text(encoding="utf-8"))
+        return {}
+    except Exception as e:
+        # 파일 로드 실패 시 에러 메시지 출력 및 빈 딕셔너리 반환
+        print(f"⚠️ Failed to load major categories: {e}")
+        return {}
 
-import re
+MAIN_CATEGORIES = _load_major_categories()
 
 # list_departments 쿼리 확장 함수
 def _expand_category_query(query: str) -> tuple[list[str], str]:
@@ -153,278 +145,195 @@ def _expand_category_query(query: str) -> tuple[list[str], str]:
     return dedup_tokens, embed_text
 
 
+# ==================== Major detail helpers ====================
+_MAJOR_RECORDS_CACHE = None
+_MAJOR_ID_MAP: dict[str, Any] = {}
+_MAJOR_NAME_MAP: dict[str, Any] = {}
+_MAJOR_ALIAS_MAP: dict[str, Any] = {}
 
-@tool
-def retrieve_courses(
-    query: Optional[str] = None,
-    university: Optional[str] = None,
-    college: Optional[str] = None,
-    department: Optional[str] = None,
-    grade: Optional[str] = None,
-    semester: Optional[str] = None,
-    top_k: int = 5
-) -> List[Dict[str, Any]]:
-    """
-    대학 과목 데이터베이스에서 관련 과목을 검색합니다.
-    학과명은 임베딩 기반으로 자동 정규화되어 유연한 검색을 지원합니다.
 
-    ** 중요: 이 함수는 LLM이 자율적으로 호출할 수 있는 Tool입니다 **
-    ** 학생이 특정 대학, 학과, 과목에 대해 질문하면 반드시 이 툴을 먼저 호출해야 합니다! **
+def _normalize_major_key(value: str) -> str:
+    return re.sub(r"\s+", "", (value or "").lower())
 
-    ** 필수 사용 상황 **
-    - 학생이 특정 대학/학과를 언급할 때 (예: "홍익대학교 컴퓨터공학", "서울대 전자공학과")
-    - 학생이 과목 추천을 요청할 때 (예: "인공지능 과목 추천해줘", "1학년 필수 과목")
-    - 학생이 특정 분야 과목을 물어볼 때 (예: "데이터분석 과목", "네트워크 관련 수업")
 
-    ** 호출 방법 **
-    1. query만 사용: retrieve_courses(query="홍익대학교 컴퓨터공학")
-    2. 파라미터만 사용: retrieve_courses(university="홍익대학교", department="컴퓨터공학")
-    3. 혼합 사용: retrieve_courses(query="인공지능", university="홍익대학교")
+def _ensure_major_records():
+    global _MAJOR_RECORDS_CACHE, _MAJOR_ID_MAP, _MAJOR_NAME_MAP, _MAJOR_ALIAS_MAP
+    if _MAJOR_RECORDS_CACHE is not None:
+        return
 
-    Args:
-        query: 검색 쿼리 (옵션, 예: "인공지능 관련 과목", "1학년 필수 과목")
-               query가 없으면 다른 파라미터들로 자동 생성됩니다.
-        university: 대학교 이름 (옵션, 예: "서울대학교", "홍익대학교")
-        college: 단과대학 이름 (옵션, 예: "공과대학", "자연과학대학")
-        department: 학과 이름 (옵션, 예: "컴퓨터공학", "전자공학", "바이오융합")
-        grade: 학년 (옵션, 예: "1학년", "2학년")
-        semester: 학기 (옵션, 예: "1학기", "2학기")
-        top_k: 검색할 과목 수 (기본값: 5)
+    records = load_major_detail()
+    _MAJOR_RECORDS_CACHE = records
+    id_map: dict[str, Any] = {}
+    name_map: dict[str, Any] = {}
+    alias_map: dict[str, Any] = {}
 
-    Returns:
-        과목 리스트 [{"id": "...", "name": "...", "university": "...", ...}, ...]
-    """
-    # query가 없으면 다른 파라미터들로부터 자동 생성
-    auto_generated = False
-    if not query:
-        query_parts = []
-        if university:
-            query_parts.append(university)
-        if college:
-            query_parts.append(college)
-        if department:
-            query_parts.append(department)
-        if grade:
-            query_parts.append(grade)
-        if semester:
-            query_parts.append(semester)
+    for record in records:
+        if record.major_id:
+            id_map[record.major_id] = record
 
-        if query_parts:
-            query = " ".join(query_parts)
-            auto_generated = True
-        else:
-            # 아무 파라미터도 없으면 기본 쿼리
-            query = "추천 과목"
-            auto_generated = True
+        if record.major_name:
+            norm_name = _normalize_major_key(record.major_name)
+            if norm_name:
+                name_map[norm_name] = record
+                alias_map.setdefault(norm_name, record)
 
-    if auto_generated:
-        print(f"✅ Using retrieve_courses tool (auto-generated query: '{query}')")
-        print(f"   Params: university={university}, college={college}, department={department}, grade={grade}, semester={semester}")
-    else:
-        print(f"✅ Using retrieve_courses tool with query: '{query}'")
-    # 1. 쿼리에서 필터 자동 추출 (예: "서울대 컴퓨터공학과 1학년" → university, department, grade)
-    extracted = extract_filters(query)
-    print(f"   Extracted filters: {extracted}")
+        for alias in getattr(record, "department_aliases", []) or []:
+            norm_alias = _normalize_major_key(alias)
+            if norm_alias and norm_alias not in alias_map:
+                alias_map[norm_alias] = record
 
-    # 2. 파라미터로 받은 필터와 추출한 필터 병합 (파라미터가 우선)
-    filters = extracted.copy() if extracted else {}
-    if university:
-        filters['university'] = university
-    if college:
-        filters['college'] = college
-    if department:
-        filters['department'] = department
-    if grade:
-        filters['grade'] = grade
-    if semester:
-        filters['semester'] = semester
+    _MAJOR_ID_MAP = id_map
+    _MAJOR_NAME_MAP = name_map
+    _MAJOR_ALIAS_MAP = alias_map
 
-    # 3. Chroma DB 쿼리 형식으로 필터 생성
-    chroma_filter = build_chroma_filter(filters) if filters else None
 
-    # 4. 벡터 DB에서 유사도 검색 수행
-    docs: List[Document] = retrieve_with_filter(
-        question=query,
-        search_k=top_k,
-        metadata_filter=chroma_filter
-    )
+def _get_major_records() -> list[Any]:
+    _ensure_major_records()
+    return _MAJOR_RECORDS_CACHE or []
 
-    # 5. 검색 결과가 없을 때 예외처리
-    if not docs:
-        print(f"⚠️  WARNING: No courses found for query='{query}', filters={chroma_filter}")
-        return [{
-            "error": "no_results",
-            "message": "사용자 질문에 대한 정보를 가져올 수 없었습니다.",
-            "suggestion": "get_search_help 툴을 사용하여 검색 가능한 방법을 안내하세요."
-        }]
 
-    # 6. LangChain Document를 LLM이 이해하기 쉬운 Dict 형태로 변환
-    results = []
-    for idx, doc in enumerate(docs):
-        meta = doc.metadata
-        results.append({
-            "id": f"course_{idx}",
-            "name": meta.get("name", "[이름 없음]"),
-            "university": meta.get("university", "[정보 없음]"),
-            "college": meta.get("college", "[정보 없음]"),
-            "department": meta.get("department", "[정보 없음]"),
-            "grade_semester": meta.get("grade_semester", "[정보 없음]"),
-            "classification": meta.get("course_classification", "[정보 없음]"),
-            "description": doc.page_content or "[설명 정보가 제공되지 않았습니다]"
-        })
+def _lookup_major_by_name(name: str) -> Any | None:
+    if not name:
+        return None
+    _ensure_major_records()
+    key = _normalize_major_key(name)
+    return _MAJOR_NAME_MAP.get(key) or _MAJOR_ALIAS_MAP.get(key)
 
-    print(f"✅ Found {len(results)} courses")
-    for r in results[:3]:  # 처음 3개만 출력
-        print(f"   - {r['name']} ({r['university']} {r['department']})")
 
+def _search_major_records_by_vector(query_text: str, limit: int) -> list[Any]:
+    if not query_text.strip():
+        return []
+
+    _ensure_major_records()
+    try:
+        vectorstore = get_major_vectorstore()
+    except Exception as exc:
+        print(f"⚠️  Unable to load major vectorstore for query '{query_text}': {exc}")
+        return []
+
+    try:
+        docs = vectorstore.similarity_search(query_text, k=max(limit, 5))
+    except Exception as exc:
+        print(f"⚠️  Vector search failed for majors query '{query_text}': {exc}")
+        return []
+
+    matches: list[Any] = []
+    seen_ids: set[str] = set()
+    for doc in docs:
+        meta = doc.metadata or {}
+        major_id = meta.get("major_id")
+        if not major_id or major_id in seen_ids:
+            continue
+        record = _MAJOR_ID_MAP.get(major_id)
+        if record is None:
+            continue
+        seen_ids.add(major_id)
+        matches.append(record)
+        if len(matches) >= limit:
+            break
+    return matches
+
+
+def _filter_records_by_tokens(tokens: list[str], limit: int) -> list[Any]:
+    if not tokens:
+        return []
+    normalized = [t.lower() for t in tokens if t]
+    if not normalized:
+        return []
+
+    results: list[Any] = []
+    seen_ids: set[str] = set()
+    for record in _get_major_records():
+        target = _normalize_major_key(record.major_name)
+        if all(tok in target for tok in normalized):
+            if record.major_id and record.major_id in seen_ids:
+                continue
+            if record.major_id:
+                seen_ids.add(record.major_id)
+            results.append(record)
+            if len(results) >= limit:
+                break
     return results
 
 
-@tool
-def get_course_detail(course_id: str, courses_context: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _find_majors(query: str, limit: int = 10) -> list[Any]:
     """
-    이전에 검색된 과목 리스트에서 특정 과목의 상세 정보를 가져옵니다.
-
-    ** 사용 시나리오 **
-    1. LLM이 먼저 retrieve_courses로 과목 리스트를 가져옴
-    2. 학생이 특정 과목에 대해 더 자세히 물어봄
-    3. LLM이 이 툴을 사용하여 해당 과목의 상세 정보를 조회
-
-    Args:
-        course_id: 과목 ID (예: "course_0", "course_1")
-        courses_context: 이전에 retrieve_courses로 가져온 과목 리스트
-
-    Returns:
-        과목 상세 정보 {"id": "...", "name": "...", "description": "...", ...}
+    통합 전공 검색 함수:
+    1. 정확히 일치하는 전공명 확인
+    2. (정확 일치 없을 시) 토큰 별칭 확인
+    3. 벡터 유사도 검색 (항상 수행하여 연관 전공 포함)
+    4. (결과 없을 시) 토큰 포함 여부 필터링
     """
-    print(f"✅ Using get_course_detail tool for course_id: {course_id}")
-    # 주어진 course_id와 일치하는 과목을 courses_context에서 찾아 반환
-    for course in courses_context:
-        if course.get("id") == course_id:
-            return course
+    _ensure_major_records()
+    matches: list[Any] = []
+    seen_ids: set[str] = set()
 
-    # 해당 ID가 없으면 에러 메시지와 사용 가능한 ID 목록 반환
-    return {
-        "error": f"ID '{course_id}'에 해당하는 과목을 찾을 수 없습니다.",
-        "available_ids": [c["id"] for c in courses_context]
-    }
+    # 1. Direct Match (정확히 일치하는 전공명 검색)
+    direct = _lookup_major_by_name(query)
+    if direct:
+        matches.append(direct)
+        if direct.major_id:
+            seen_ids.add(direct.major_id)
 
-
-@tool
-def list_departments(query: str, top_k: int = 10) -> List[str]:
-    """
-    Vector DB에 있는 학과 목록을 조회합니다. (학과명만 반환, 대학명 제외)
-    임베딩 + 키워드 기반 하이브리드 검색으로 유연한 학과명 매칭을 지원합니다.
-
-    - query = "전체" → 모든 학과
-    - query = "공학" → 공학 대분류 전체 (컴퓨터/전기/기계/화공/산업/건축/에너지 ...)
-    - query = "컴퓨터 / 소프트웨어 / 인공지능" → 해당 value 기반으로 학과 검색
-    """
-    print(f"✅ Using list_departments tool with query: '{query}'")
-
-    vs = load_vectorstore()
-    collection = vs._collection
-
-    # 전체 메타데이터 조회
-    results = collection.get(include=['metadatas'])
-
-    departments_set = set()
-    all_departments_with_info = []
-
-    for meta in results['metadatas']:
-        university = meta.get('university', '')
-        college = meta.get('college', '')
-        department = meta.get('department', '')
-
-        if department:
-            departments_set.add(department)
-            all_departments_with_info.append({
-                "university": university,
-                "college": college,
-                "department": department
-            })
-
-    # 0. 전체 요청이면 전부 반환
-    if query.strip() == "전체" or not query.strip():
-        result = sorted(list(departments_set))
-        print(f"✅ Found {len(result)} unique departments (all)")
-        return result
-
-    # 1. 카테고리/키워드 쿼리 확장
     tokens, embed_text = _expand_category_query(query)
-    if not tokens:
-        tokens = [query.strip()]
-    query_tokens_lower = [t.lower() for t in tokens]
-    print(f"   ℹ️ Expanded query tokens: {query_tokens_lower}")
-    print(f"   ℹ️ Embedding text: '{embed_text}'")
 
-    # 2. 문자열 기반 매칭 (여러 토큰 중 하나라도 포함되면 매칭)
-    matching_departments = set()
-    for dept_info in all_departments_with_info:
-        univ_l = dept_info['university'].lower()
-        college_l = dept_info['college'].lower()
-        dept_l = dept_info['department'].lower()
+    # 2. Alias Match (only if no direct match)
+    # 2. 별칭 검색 (정확한 매칭이 없을 경우, 토큰별로 별칭 확인)
+    if not matches and tokens:
+        for token in tokens:
+            alias_match = _lookup_major_by_name(token)
+            if alias_match and alias_match not in matches:
+                matches.append(alias_match)
+                if alias_match.major_id:
+                    seen_ids.add(alias_match.major_id)
 
-        if any(
-            tok in univ_l or tok in college_l or tok in dept_l
-            for tok in query_tokens_lower
-        ):
-            matching_departments.add(dept_info['department'])
+    # 3. Vector Search (벡터 유사도 검색 - 항상 수행하여 연관 전공 포함)
+    search_text = embed_text or query
+    vector_matches = _search_major_records_by_vector(search_text, limit=max(limit * 3, 10))
+    for record in vector_matches:
+        if record.major_id and record.major_id in seen_ids:
+            continue
+        matches.append(record)
+        if record.major_id:
+            seen_ids.add(record.major_id)
+        if len(matches) >= max(limit, 10):
+            break
 
-    print(f"   ℹ️ String match found {len(matching_departments)} departments")
-
-    # 3. 임베딩 기반 유사도 검색 (항상 수행해서 하이브리드 형태로 사용)
-    embedding_candidates: list[str] = []
-    try:
-        embeddings = get_embeddings()
-        departments, dept_matrix = _load_department_embeddings()
-
-        # 카테고리 전체 의미를 반영한 문장을 임베딩
-        query_vec = np.array(embeddings.embed_query(embed_text))
-
-        norms = np.linalg.norm(dept_matrix, axis=1) * np.linalg.norm(query_vec)
-        norms = np.where(norms == 0, 1e-10, norms)
-        sims = (dept_matrix @ query_vec) / norms
-
-        # 상위 후보 + threshold
-        threshold = 0.45  # 살짝 완화해서 "특이하지만 유사한" 학과까지 포착
-        top_indices = np.argsort(sims)[::-1]
-
-        for idx in top_indices:
-            if len(embedding_candidates) >= top_k:
+    # 4. Fallback Token Filter (if no matches yet)
+    # 4. 토큰 필터링 (검색 결과가 없을 경우 최후의 수단)
+    if not matches and tokens:
+        token_matches = _filter_records_by_tokens(tokens, limit=max(limit, 10))
+        for record in token_matches:
+            if record.major_id and record.major_id in seen_ids:
+                continue
+            matches.append(record)
+            if record.major_id:
+                seen_ids.add(record.major_id)
+            if len(matches) >= limit:
                 break
-            if sims[idx] < threshold:
-                break
-            dept_name = departments[idx]
-            embedding_candidates.append(dept_name)
-            print(f"   - [emb] {dept_name} (similarity: {sims[idx]:.3f})")
 
-    except Exception as e:
-        print(f"⚠️  Error during embedding search: {e}")
+    return matches[:limit]
 
-    # 4. 문자열 + 임베딩 결과 합치기 (하이브리드)
-    combined = list(
-        dict.fromkeys(  # 순서 유지 + 중복 제거
-            list(matching_departments) + embedding_candidates
-        )
-    )
 
-    if not combined:
-        print("⚠️  WARNING: No departments found (string + embedding)")
-        return ["검색 결과가 없습니다. 다른 키워드로 검색해보세요."]
-
-    # 최종 결과는 너무 길지 않게 top_k 만큼만 자르기
-    result = combined[:top_k]
-    print(f"✅ Returning {len(result)} departments (hybrid string + embedding)")
-
-    # 📝 구조화된 포맷으로 반환 (LLM이 복사하기 쉽게)
+def _format_department_output(
+    query: str,
+    departments: list[str],
+    total_available: int | None = None,
+    dept_univ_map: Optional[dict[str, list[str]]] = None,
+) -> str:
     formatted_output = "=" * 80 + "\n"
-    formatted_output += f"🎯 검색 결과: '{query}'에 대한 학과 {len(result)}개\n"
+    formatted_output += f"🎯 검색 결과: '{query}'에 대한 학과 {len(departments)}개\n"
+    if total_available is not None:
+        formatted_output += f"(총 {total_available}개 중 상위 {len(departments)}개 표시)\n"
     formatted_output += "=" * 80 + "\n\n"
     formatted_output += "📋 **정확한 학과명 목록** (아래 백틱 안의 이름을 그대로 복사하세요):\n\n"
 
-    for i, dept in enumerate(result, 1):
+    for i, dept in enumerate(departments, 1):
         formatted_output += f"{i}. `{dept}`\n"
+        if dept_univ_map:
+            universities = dept_univ_map.get(dept)
+            if universities:
+                formatted_output += f"   - 개설 대학 예시: {', '.join(universities)}\n"
 
     formatted_output += "\n" + "=" * 80 + "\n"
     formatted_output += "🚨 **중요 - 답변 작성 규칙**:\n"
@@ -438,8 +347,344 @@ def list_departments(query: str, top_k: int = 10) -> List[str]:
     formatted_output += "   - 목록에 `지능로봇`인데 → 답변: **지능로봇공학과** ❌ (단어 추가)\n"
     formatted_output += "   - 목록에 `화공학부`인데 → 답변: **화공학과** ❌ (학부→학과 변경)\n"
     formatted_output += "=" * 80
-
     return formatted_output
+
+
+def _extract_university_entries(record: Any) -> list[Dict[str, str]]:
+    entries: list[Dict[str, str]] = []
+    raw_list = getattr(record, "university", None)
+    if not isinstance(raw_list, list):
+        return entries
+
+    seen: set[tuple[str, str, str]] = set()
+    for item in raw_list:
+        school = (item.get("schoolName") or "").strip()
+        campus = (item.get("campus_nm") or item.get("campusNm") or "").strip()
+        major_name = (item.get("majorName") or "").strip()
+        area = (item.get("area") or "").strip()
+        url = (item.get("schoolURL") or "").strip()
+
+        dept_label = major_name or record.major_name
+        if not school:
+            continue
+
+        dedup_key = (school, dept_label, campus)
+        if dedup_key in seen:
+            continue
+        seen.add(dedup_key)
+
+        entry: Dict[str, str] = {
+            "university": school,
+            "college": campus or area or "",
+            "department": dept_label,
+        }
+        if area:
+            entry["area"] = area
+        if campus:
+            entry["campus"] = campus
+        if url:
+            entry["url"] = url
+        if record.major_name and record.major_name != dept_label:
+            entry["standard_major_name"] = record.major_name
+
+        entries.append(entry)
+
+    return entries
+
+
+def _collect_university_pairs(record: Any, limit: int = 3) -> list[str]:
+    entries = _extract_university_entries(record)
+    pairs: list[str] = []
+    for entry in entries[:limit]:
+        university = entry.get("university", "").strip()
+        department = entry.get("department", "").strip()
+        label = " ".join(token for token in [university, department] if token)
+        if label and label not in pairs:
+            pairs.append(label)
+    return pairs
+
+
+def _dedup_preserve_order(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for item in items:
+        if item and item not in seen:
+            seen.add(item)
+            ordered.append(item)
+    return ordered
+
+
+def _extract_job_list(job_text: str) -> list[str]:
+    if not job_text:
+        return []
+    parts = re.split(r"[,/\n]", job_text)
+    cleaned = [part.strip() for part in parts if len(part.strip()) > 1]
+    return _dedup_preserve_order(cleaned)
+
+
+def _format_enter_field(record: Any) -> list[Dict[str, str]]:
+    """
+    major_detail.json의 enter_field 구조를 사용자에게 보여주기 쉬운 형태로 정리한다.
+    """
+    formatted: list[Dict[str, str]] = []
+    raw_list = getattr(record, "enter_field", None)
+    if not isinstance(raw_list, list):
+        return formatted
+
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        category = (item.get("gradeuate") or item.get("graduate") or "").strip()
+        description = _strip_html(item.get("description") or "").strip()
+        if not category and not description:
+            continue
+        entry: Dict[str, str] = {}
+        if category:
+            entry["category"] = category
+        if description:
+            entry["description"] = description
+        formatted.append(entry)
+
+    return formatted
+
+
+def _format_career_activities(record: Any) -> list[Dict[str, str]]:
+    """
+    학과 준비 활동(career_act)을 act_name/description 짝으로 정리해 LLM이 바로 읽도록 반환한다.
+    """
+    activities: list[Dict[str, str]] = []
+    raw_list = getattr(record, "career_act", None)
+    if not isinstance(raw_list, list):
+        return activities
+
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        name = (item.get("act_name") or "").strip()
+        description = _strip_html(item.get("act_description") or "").strip()
+        if not name and not description:
+            continue
+        entry: Dict[str, str] = {}
+        if name:
+            entry["act_name"] = name
+        if description:
+            entry["act_description"] = description
+        activities.append(entry)
+
+    return activities
+
+
+def _parse_qualifications(record: Any) -> tuple[str, list[str]]:
+    """
+    qualifications 필드를 문자열/리스트 여부에 관계없이 일관된 리스트와 문자열로 변환한다.
+    """
+    raw_value = getattr(record, "qualifications", None)
+    if raw_value is None:
+        return "", []
+
+    tokens: list[str] = []
+    if isinstance(raw_value, list):
+        tokens = [str(item).strip() for item in raw_value if str(item).strip()]
+    else:
+        text = str(raw_value).strip()
+        if text:
+            parts = [p.strip() for p in re.split(r"[,/\n]", text) if p.strip()]
+            tokens = parts
+
+    deduped = _dedup_preserve_order(tokens)
+    joined = ", ".join(deduped)
+    return joined, deduped
+
+
+def _format_main_subjects(record: Any) -> list[Dict[str, str]]:
+    """
+    main_subject 배열에서 과목명과 요약을 추출해 LLM 응답에 바로 포함할 수 있는 형태로 가공한다.
+    """
+    subjects: list[Dict[str, str]] = []
+    raw_list = getattr(record, "main_subject", None)
+    if not isinstance(raw_list, list):
+        return subjects
+
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        name = (item.get("SBJECT_NM") or item.get("subject_name") or "").strip()
+        summary = _strip_html(item.get("SBJECT_SUMRY") or item.get("subject_description") or "").strip()
+        if not name and not summary:
+            continue
+        entry: Dict[str, str] = {}
+        if name:
+            entry["SBJECT_NM"] = name
+        if summary:
+            entry["SBJECT_SUMRY"] = summary
+        subjects.append(entry)
+
+    return subjects
+
+
+def _resolve_major_for_career(query: str) -> Any | None:
+    """Helper to find the most relevant major record for career info."""
+    if not query:
+        return None
+
+    # Use _find_majors to get the best match
+    matches = _find_majors(query, limit=1)
+    return matches[0] if matches else None
+
+
+@tool
+def list_departments(query: str, top_k: int = 10) -> str:
+    """
+    Pinecone majors vector DB를 기반으로 학과 목록을 조회합니다.
+    - query = "전체" → 전체 전공 목록을 반환 (상위 top_k까지만 표시)
+    - query = "컴퓨터 / 소프트웨어 / 인공지능" → 해당 키워드와 유사한 전공을 검색
+    - query = "컴공" 등 별칭 → major_detail.json에서 추출한 별칭 매핑/벡터 검색으로 정규화
+    - 반환 포맷에는 학과명과 개설 대학 예시가 함께 포함됩니다.
+    """
+    raw_query = (query or "").strip()
+    _log_tool_start("list_departments", f"학과 목록 조회 - query='{raw_query or '전체'}', top_k={top_k}")
+    print(f"✅ Using list_departments tool with query: '{raw_query}'")
+
+    _ensure_major_records()
+
+    # 전체 목록 요청
+    if raw_query == "전체" or not raw_query:
+        dept_univ_map: dict[str, list[str]] = {}
+        all_names = []
+        for record in _get_major_records():
+            if not record.major_name:
+                continue
+            all_names.append(record.major_name)
+            pairs = _collect_university_pairs(record)
+            if pairs:
+                bucket = dept_univ_map.setdefault(record.major_name, [])
+                for pair in pairs:
+                    if pair not in bucket:
+                        bucket.append(pair)
+        all_names = sorted(set(all_names))
+        limited = all_names[:top_k] if top_k else all_names
+        print(f"✅ Returning {len(limited)} majors out of {len(all_names)} total")
+        result_text = _format_department_output(
+            raw_query or "전체",
+            limited,
+            total_available=len(all_names),
+            dept_univ_map=dept_univ_map,
+        )
+        _log_tool_result("list_departments", f"총 {len(all_names)}개 중 {len(limited)}개 목록 반환")
+        return result_text
+
+    tokens, embed_text = _expand_category_query(raw_query)
+    print(f"   ℹ️ Expanded query tokens: {tokens}")
+    print(f"   ℹ️ Embedding text: '{embed_text}'")
+
+    matches = _find_majors(raw_query, limit=max(top_k, 10))
+    dept_univ_map: dict[str, list[str]] = {}
+
+    for record in matches:
+        pairs = _collect_university_pairs(record)
+        if pairs:
+            bucket = dept_univ_map.setdefault(record.major_name, [])
+            for pair in pairs:
+                if pair not in bucket:
+                    bucket.append(pair)
+
+    department_names = [record.major_name for record in matches if record.major_name]
+    if not department_names:
+        print("⚠️  WARNING: No majors found for the given query")
+        _log_tool_result("list_departments", "검색 결과 없음")
+        return "검색 결과가 없습니다. 다른 키워드로 검색해보세요."
+
+    result = department_names[:top_k]
+    print(f"✅ Returning {len(result)} majors from major_detail vector DB")
+    _log_tool_result("list_departments", f"{len(result)}개 학과 정보 반환")
+    return _format_department_output(raw_query, result, dept_univ_map=dept_univ_map)
+
+
+@tool
+def get_major_career_info(major_name: str) -> Dict[str, Any]:
+    """
+    특정 전공(major)에 대한 세분화된 진출 직업 목록과 진출 분야 설명을 반환합니다.
+    추가로 추천 활동, 관련 자격증, 주요 전공 과목 정보도 함께 제공합니다.
+
+    Args:
+        major_name: 전공명 또는 별칭 (예: "컴퓨터공학과", "AI융합학부")
+
+    Returns:
+        {
+            "major": "컴퓨터공학과",
+            "jobs": ["3D프린팅전문가", ...],
+            "job_summary": "3D프린팅전문가, ...",
+            "enter_field": [{"category": "기업 및 산업체", "description": "..."}, ...],
+            "career_act": [{"act_name": "건축박람회", "act_description": "..."}, ...],
+            "qualifications": "건축기사, ...",
+            "qualifications_list": ["건축기사", ...],
+            "main_subject": [{"SBJECT_NM": "건축구조시스템", "SBJECT_SUMRY": "..."}, ...],
+            "source": "backend/data/major_detail.json"
+        }
+    """
+    query = (major_name or "").strip()
+    _log_tool_start("get_major_career_info", f"전공 진로 정보 조회 - major='{query}'")
+    print(f"✅ Using get_major_career_info tool for: '{query}'")
+
+    if not query:
+        result = {
+            "error": "invalid_query",
+            "message": "전공명을 입력해 주세요.",
+            "suggestion": "예: '컴퓨터공학과', '소프트웨어공학과'"
+        }
+        _log_tool_result("get_major_career_info", "전공명 누락 - 오류 반환")
+        return result
+
+    record = _resolve_major_for_career(query)
+    if record is None:
+        print(f"⚠️  WARNING: No career data found for '{query}'")
+        result = {
+            "error": "no_results",
+            "message": f"'{query}' 전공의 진출 직업 정보를 찾을 수 없습니다.",
+            "suggestion": "학과명을 정확히 입력하거나 list_departments 툴로 전공명을 먼저 확인하세요."
+        }
+        _log_tool_result("get_major_career_info", "전공 데이터 미발견 - 오류 반환")
+        return result
+
+    job_text = (getattr(record, "job", "") or "").strip()
+    job_list = _extract_job_list(job_text)
+    enter_field = _format_enter_field(record)
+    career_activities = _format_career_activities(record)
+    qualifications_text, qualifications_list = _parse_qualifications(record)
+    main_subjects = _format_main_subjects(record)
+
+    response: Dict[str, Any] = {
+        "major": record.major_name,
+        "jobs": job_list,
+        "job_summary": job_text,
+        "enter_field": enter_field,
+        "source": "backend/data/major_detail.json"
+    }
+
+    if career_activities:
+        response["career_act"] = career_activities
+    if qualifications_text:
+        response["qualifications"] = qualifications_text
+    if qualifications_list:
+        response["qualifications_list"] = qualifications_list
+    if main_subjects:
+        response["main_subject"] = main_subjects
+
+    if not job_list:
+        response["warning"] = "데이터에 등록된 직업 목록이 없습니다."
+    else:
+        print(f"✅ Retrieved {len(job_list)} jobs for '{record.major_name}'")
+
+    if enter_field:
+        print(f"   ℹ️ Enter field categories: {[item.get('category') for item in enter_field]}")
+
+    activity_info = f"활동 {len(career_activities)}건" if career_activities else "활동 정보 없음"
+    subject_info = f"주요 과목 {len(main_subjects)}건" if main_subjects else "주요 과목 정보 없음"
+    _log_tool_result(
+        "get_major_career_info",
+        f"{record.major_name} - 직업 {len(job_list)}건, {activity_info}, {subject_info} 반환",
+    )
+    return response
 
 
 @tool
@@ -461,335 +706,57 @@ def get_universities_by_department(department_name: str) -> List[Dict[str, str]]
             ...
         ]
     """
-    print(f"✅ Using get_universities_by_department tool for: '{department_name}'")
+    query = (department_name or "").strip()
+    _log_tool_start("get_universities_by_department", f"학과별 대학 조회 - department='{query}'")
+    print(f"✅ Using get_universities_by_department tool for: '{query}'")
 
-    vs = load_vectorstore()
-    collection = vs._collection
-
-    # 모든 메타데이터 가져오기
-    results = collection.get(include=['metadatas'])
-
-    # 해당 학과가 있는 대학 찾기
-    universities_set = set()
-    for meta in results['metadatas']:
-        university = meta.get('university', '')
-        college = meta.get('college', '')
-        department = meta.get('department', '')
-
-        # 정확한 매칭 또는 부분 매칭
-        if department and (department == department_name or department_name in department):
-            universities_set.add((university, college, department))
-
-    # 리스트로 변환
-    result = [
-        {
-            "university": univ,
-            "college": college,
-            "department": dept
-        }
-        for univ, college, dept in sorted(universities_set)
-    ]
-
-    print(f"✅ Found {len(result)} universities offering '{department_name}'")
-
-    if not result:
-        print(f"⚠️  WARNING: No universities found offering '{department_name}'")
-        return [{
-            "error": "no_results",
-            "message": f"'{department_name}' 학과를 개설한 대학을 찾을 수 없습니다.",
-            "suggestion": "학과명을 정확히 확인하거나 list_departments로 사용 가능한 학과 목록을 먼저 조회하세요."
+    if not query:
+        result = [{
+            "error": "invalid_query",
+            "message": "학과명을 입력해 주세요.",
+            "suggestion": "예: '컴퓨터공학과', '소프트웨어학부'"
         }]
+        _log_tool_result("get_universities_by_department", "학과명 누락 - 오류 반환")
+        return result
 
-    return result
+    _ensure_major_records()
 
+    matches: list[Any] = []
+    direct = _lookup_major_by_name(query)
+    if direct:
+        matches.append(direct)
+    else:
+        # 정확히 일치하는 학과가 없으면 유사 학과 검색
+        matches = _find_majors(query, limit=5)
 
-@tool
-def recommend_curriculum(
-    university: str,
-    department: str,
-    interests: Optional[str] = None,
-    start_grade: int = 2,
-    start_semester: int = 1,
-    end_grade: int = 4,
-    end_semester: int = 2,
-    courses_per_semester: int = 5
-) -> List[Dict[str, Any]]:
-    """
-    학생의 관심사를 고려하여 학기별 맞춤 커리큘럼을 추천합니다.
+    aggregated: list[Dict[str, str]] = []
+    for record in matches:
+        entries = _extract_university_entries(record)
+        if entries:
+            aggregated.extend(entries)
+        if len(aggregated) >= 50:
+            break
 
-    ** 중요: 이 함수는 LLM이 자율적으로 호출할 수 있는 Tool입니다 **
-    학생이 "2학년부터 4학년까지 커리큘럼 추천해줘", "전체 커리큘럼 알려줘" 같은 질문을 할 때 사용하세요.
-
-    ** 사용 시나리오 **
-    1. "홍익대 컴퓨터공학과 2학년부터 4학년까지 커리큘럼 추천해줘"
-       → university="홍익대학교", department="컴퓨터공학", start_grade=2, end_grade=4
-    2. "인공지능에 관심있는데 커리큘럼 추천해줘"
-       → interests="인공지능"으로 호출하여 관련 과목 우선 선택
-
-    Args:
-        university: 대학교 이름 (예: "홍익대학교", "서울대학교")
-        department: 학과 이름 (예: "컴퓨터공학", "전자공학")
-        interests: 학생의 관심 분야 키워드 (예: "인공지능", "데이터분석", "보안")
-        start_grade: 시작 학년 (기본값: 2)
-        start_semester: 시작 학기 (기본값: 1)
-        end_grade: 종료 학년 (기본값: 4)
-        end_semester: 종료 학기 (기본값: 2)
-        courses_per_semester: 학기당 추천 과목 수 (기본값: 5)
-
-    Returns:
-        학기별 추천 과목 리스트 [
-            {
-                "semester": "2학년 1학기",
-                "courses": [
-                    {"name": "...", "description": "...", "classification": "..."},
-                    {"name": "...", "description": "...", "classification": "..."},
-                    ...
-                ],
-                "count": 5
-            },
-            ...
-        ]
-    """
-    print(f"✅ Using recommend_curriculum tool: {university} {department}, interests='{interests}'")
-
-    vs = load_vectorstore()
-    embeddings = get_embeddings()
-
-    # 관심사 임베딩 생성 (있는 경우)
-    interests_embedding = None
-    if interests:
-        interests_embedding = embeddings.embed_query(interests)
-
-    curriculum = []
-    selected_course_names = set()  # 중복 과목 방지용
-
-    # 학기별로 반복
-    for grade in range(start_grade, end_grade + 1):
-        for semester in range(1, 3):  # 1학기, 2학기
-            # 종료 조건 확인
-            if grade == end_grade and semester > end_semester:
-                break
-            if grade == start_grade and semester < start_semester:
-                continue
-
-            semester_label = f"{grade}학년 {semester}학기"
-
-            # 해당 학기의 과목 검색
-            filter_dict = {
-                'university': university,
-                'department': department,
-                'grade': f"{grade}학년",
-                'semester': f"{semester}학기"
-            }
-
-            chroma_filter = build_chroma_filter(filter_dict)
-            print(f"   [{semester_label}] Searching with filter: {filter_dict}")
-
-            try:
-                # 해당 학기 과목 검색 (더 많은 후보 가져오기)
-                docs = retrieve_with_filter(
-                    question=interests if interests else "추천 과목",
-                    search_k=20,  # 학기당 5개 선택하므로 더 많은 후보 필요
-                    metadata_filter=chroma_filter
-                )
-
-                if not docs:
-                    curriculum.append({
-                        "semester": semester_label,
-                        "courses": [],
-                        "count": 0,
-                        "message": "해당 학기에 개설된 과목이 없습니다."
-                    })
-                    continue
-
-                # 이미 선택된 과목 제외
-                available_docs = [
-                    doc for doc in docs
-                    if doc.metadata.get("name", "") not in selected_course_names
-                ]
-
-                if not available_docs:
-                    print(f"   ⚠️  [{semester_label}] 모든 과목이 이미 선택됨")
-                    curriculum.append({
-                        "semester": semester_label,
-                        "courses": [],
-                        "count": 0,
-                        "message": "해당 학기의 과목이 이미 다른 학기에 선택되었습니다."
-                    })
-                    continue
-
-                # 학기당 최대 courses_per_semester개 과목 선택
-                selected_courses = []
-                for i, doc in enumerate(available_docs[:courses_per_semester]):
-                    meta = doc.metadata
-                    course_name = meta.get("name", "[이름 없음]")
-
-                    # 중복 체크
-                    if course_name in selected_course_names:
-                        continue
-
-                    # 선택된 과목 추가
-                    selected_course_names.add(course_name)
-
-                    # 실제 메타데이터 로깅 (디버깅용)
-                    actual_univ = meta.get("university", "[정보 없음]")
-                    actual_dept = meta.get("department", "[정보 없음]")
-                    actual_grade_sem = meta.get("grade_semester", "[정보 없음]")
-                    print(f"   ✅ [{semester_label}] Selected ({i+1}/{courses_per_semester}): {course_name}")
-                    print(f"      Source: {actual_univ} / {actual_dept} / {actual_grade_sem}")
-
-                    selected_courses.append({
-                        "name": course_name,
-                        "classification": meta.get("course_classification", "[정보 없음]"),
-                        "description": doc.page_content
-                    })
-
-                    # 원하는 개수만큼 선택했으면 중단
-                    if len(selected_courses) >= courses_per_semester:
-                        break
-
-                curriculum.append({
-                    "semester": semester_label,
-                    "courses": selected_courses,
-                    "count": len(selected_courses)
-                })
-
-            except Exception as e:
-                print(f"Error retrieving courses for {semester_label}: {e}")
-                curriculum.append({
-                    "semester": semester_label,
-                    "courses": [],
-                    "count": 0,
-                    "message": f"검색 중 오류 발생: {str(e)}"
-                })
-
-    # 커리큘럼 전체가 비어있거나 모든 항목이 오류인 경우 예외처리
-    valid_items = [item for item in curriculum if item.get("count", 0) > 0]
-    if not valid_items:
-        print(f"⚠️  WARNING: No valid curriculum generated for {university} {department}")
-        return [{
+    if not aggregated:
+        print(f"⚠️  WARNING: No universities found offering '{query}' in major_detail.json")
+        result = [{
             "error": "no_results",
-            "message": "사용자 질문에 대한 정보를 가져올 수 없었습니다.",
-            "suggestion": "get_search_help 툴을 사용하여 검색 가능한 방법을 안내하세요.",
-            "details": f"대학: {university}, 학과: {department}에 대한 커리큘럼을 찾을 수 없습니다."
+            "message": f"'{query}' 학과를 개설한 대학 정보를 major_detail 데이터에서 찾을 수 없습니다.",
+            "suggestion": "학과명을 정확히 입력하거나 list_departments 툴로 사용 가능한 전공명을 먼저 확인하세요."
         }]
+        _log_tool_result("get_universities_by_department", "검색 결과 없음 - 오류 반환")
+        return result
 
-    total_courses = sum(item.get("count", 0) for item in curriculum)
-    print(f"✅ Generated curriculum with {len(curriculum)} semesters ({total_courses} total courses)")
+    print(f"✅ Found {len(aggregated)} university rows for '{query}'")
+    for entry in aggregated[:5]:
+        print(
+            f"   - {entry.get('university')} / {entry.get('college')} / "
+            f"{entry.get('department')}"
+        )
+    _log_tool_result("get_universities_by_department", f"총 {len(aggregated)}건 대학 정보 반환")
+    return aggregated
 
-    return curriculum
 
-
-
-
-@tool
-def match_department_name(department_query: str) -> dict:
-    """
-    학과명을 임베딩 기반으로 표준 학과명으로 매핑합니다.
-
-    대학명과 학과명이 섞여 있는 경우 자동으로 분리하여 처리합니다.
-    대학명 정규화는 univ_mapping.json을 사용합니다.
-
-    Examples:
-        '컴공' → '컴퓨터공학과'
-        '컴퓨터과' → '컴퓨터공학과'
-        '소프트웨어' → '소프트웨어학부'
-        '홍대 컴공' → university='홍익대학교', department='컴퓨터공학과'
-        '서울대 전전' → university='서울대학교', department='전자공학과'
-        '설대 컴공' → university='서울대학교', department='컴퓨터공학과' (은어 지원)
-
-    Args:
-        department_query: 학과명 또는 "대학명 + 학과명" 형태 (예: "컴공", "홍대 컴공")
-
-    Returns:
-        {
-            "input": "원본 쿼리",
-            "university": "추출된 대학명 (있는 경우)",
-            "matched_department": "매칭된 표준 학과명",
-            "similarity": "유사도 점수"
-        }
-    """
-    from backend.rag.entity_extractor import normalize_university_name
-    import re
-
-    print(f"✅ Using match_department_name with query: '{department_query}'")
-
-    # 대학명 추출 시도
-    extracted_university = None
-    dept_only_query = department_query
-
-    # 1단계: 공백으로 분리하여 대학명 체크
-    tokens = department_query.split()
-    if len(tokens) >= 2:
-        first_token = tokens[0]
-
-        # entity_extractor의 normalize_university_name 사용
-        # 정규화 시도 (홍대 → 홍익대학교, 설대 → 서울대학교 등)
-        normalized = normalize_university_name(first_token)
-
-        # 정규화가 성공했는지 확인 (원본과 다르면 성공)
-        if normalized != first_token or normalized.endswith('대학교'):
-            extracted_university = normalized
-            # "대학교"로 끝나지 않으면 추가
-            if not extracted_university.endswith('대학교'):
-                extracted_university += '대학교'
-
-            dept_only_query = ' '.join(tokens[1:])  # 나머지를 학과명으로
-            print(f"   Extracted university: {extracted_university} (from '{first_token}')")
-            print(f"   Department query: {dept_only_query}")
-
-    # 2단계: 공백 없이 붙어있는 경우 처리 (예: "홍대컴공")
-    # 정규식으로 대학명 패턴 찾기
-    if not extracted_university:
-        # "~대학교", "~대" 패턴 찾기
-        univ_pattern = r'^([가-힣]+대학교|[가-힣]+대)'
-        univ_match = re.match(univ_pattern, department_query)
-
-        if univ_match:
-            univ_token = univ_match.group(1)
-            normalized = normalize_university_name(univ_token)
-
-            if normalized != univ_token or normalized.endswith('대학교'):
-                extracted_university = normalized
-                if not extracted_university.endswith('대학교'):
-                    extracted_university += '대학교'
-
-                # 대학명 부분을 제거한 나머지를 학과명으로
-                dept_only_query = department_query[len(univ_match.group(0)):].strip()
-                print(f"   Extracted university: {extracted_university} (from '{univ_token}')")
-                print(f"   Department query: {dept_only_query}")
-
-    embeddings = get_embeddings()
-
-    # 1) 캐시된 학과명 + 임베딩 불러오기
-    departments, dept_matrix = _load_department_embeddings()
-
-    # 2) 학과명만 임베딩하여 매칭
-    query_vec = np.array(embeddings.embed_query(dept_only_query))
-
-    # 3) 전체 학과와의 코사인 유사도 계산
-    norms = np.linalg.norm(dept_matrix, axis=1) * np.linalg.norm(query_vec)
-    # 0으로 나누는 것 방지
-    norms = np.where(norms == 0, 1e-10, norms)
-    sims = (dept_matrix @ query_vec) / norms
-
-    best_idx = int(np.argmax(sims))
-    best_match = departments[best_idx]
-    best_score = float(sims[best_idx])
-
-    print(f"   Best match: {best_match} (similarity: {best_score:.3f})")
-
-    result = {
-        "input": department_query,
-        "matched_department": best_match,
-        "similarity": best_score,
-    }
-
-    if extracted_university:
-        result["university"] = extracted_university
-
-    return result
-  
 @tool
 def get_search_help() -> str:
     """
@@ -797,12 +764,15 @@ def get_search_help() -> str:
     검색 가능한 방법들(각 툴을 호출할 수 있는 방법들)을 안내합니다.
 
     ** 언제 사용하나요? **
-    1. 다른 툴(retrieve_courses, list_departments, recommend_curriculum)의 결과가 비어있을 때
+    1. 다른 툴(list_departments, get_universities_by_department)의 결과가 비어있을 때
     2. 사용자의 질문이 너무 모호하거나 데이터베이스에 없는 정보를 요청할 때
     3. 검색 결과가 없어서 사용자에게 다른 검색 방법을 안내해야 할 때
 
     Returns:
         검색 가능한 방법들을 설명하는 가이드 메시지
     """
+    _log_tool_start("get_search_help", "검색 가이드 안내")
     print("ℹ️  Using get_search_help tool - providing usage guide to user")
-    return _get_tool_usage_guide()
+    message = _get_tool_usage_guide()
+    _log_tool_result("get_search_help", "사용자 가이드 메시지 반환")
+    return message

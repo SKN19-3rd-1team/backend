@@ -1,202 +1,228 @@
 """
 벡터 데이터베이스 (Vector Store) 관리 모듈
 
-Chroma DB를 사용하여 과목 정보를 벡터로 저장하고 로드하는 기능을 제공합니다.
+Pinecone을 사용하여 전공 정보를 벡터로 저장하고 검색하는 기능을 제공합니다.
 
-** Chroma DB란? **
-- 오픈소스 벡터 데이터베이스
+** Pinecone이란? **
+- 클라우드 기반 벡터 데이터베이스
 - 텍스트를 벡터(임베딩)로 변환하여 저장
 - 유사도 기반 검색 (Similarity Search) 지원
-- SQLite 기반으로 로컬 파일 시스템에 저장
+- Serverless 아키텍처로 확장성 제공
 
 ** 주요 기능 **
-1. build_vectorstore(): JSON 파일에서 과목 데이터를 읽어 벡터 DB 생성
-2. load_vectorstore(): 저장된 벡터 DB를 디스크에서 로드
+1. get_major_vectorstore(): 전공 추천을 위한 Pinecone 벡터 스토어 반환
+2. index_major_docs(): 전공 문서를 Pinecone에 인덱싱
+3. clear_major_index(): Pinecone 인덱스 초기화
 """
 # backend/rag/vectorstore.py
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Iterable
+from typing import Any
 import threading
 
-from langchain_core.documents import Document
-from langchain_chroma import Chroma
+from langchain_pinecone import PineconeVectorStore
+from pinecone import Pinecone, ServerlessSpec
+from pinecone.exceptions import NotFoundException
 
-from backend.config import get_settings, resolve_path, expand_paths
+from backend.config import get_settings
 from .embeddings import get_embeddings
+from .loader import MajorDoc
 
-# 벡터 스토어 싱글톤 캐시
-# 여러 툴이 동시에 호출될 때 Chroma 인스턴스를 중복 생성하지 않도록 전역 변수에 캐싱
-# ChromaDB 1.3.4의 재초기화 버그를 방지하기 위해 한 번만 로드하고 재사용
-_VECTORSTORE_CACHE = None
-_VECTORSTORE_LOCK = threading.Lock()
+# Pinecone (majors) caches
+_MAJOR_VECTORSTORE_CACHE = None
+_MAJOR_VECTORSTORE_LOCK = threading.Lock()
+_MAJOR_INDEX_CACHE = None
 
 
-def _resolve_persist_dir(persist_directory: Path | str | None) -> Path:
-    """
-    Vector DB 저장 디렉토리 경로 해석 및 생성
+# ==================== Pinecone Vector Store for Majors ====================
 
-    .env 파일의 VECTORSTORE_DIR 설정을 사용하거나, 직접 경로를 지정할 수 있습니다.
-    디렉토리가 존재하지 않으면 자동으로 생성합니다.
-
-    Args:
-        persist_directory: Vector DB 저장 경로 (None이면 .env의 VECTORSTORE_DIR 사용)
-
-    Returns:
-        Path: 절대 경로로 변환된 Vector DB 디렉토리
-    """
+def _get_pinecone_client() -> Pinecone:
+    # Pinecone API 클라이언트를 초기화하고 키 누락 시 명확한 에러를 던진다
     settings = get_settings()
-
-    # persist_directory가 None이면 설정에서 가져옴
-    directory_str = (
-        settings.vectorstore_dir
-        if persist_directory is None
-        else str(persist_directory)
-    )
-
-    # 상대 경로를 절대 경로로 변환
-    directory = resolve_path(directory_str)
-
-    # 디렉토리가 없으면 생성 (부모 디렉토리도 함께 생성)
-    directory.mkdir(parents=True, exist_ok=True)
-
-    return directory
+    if not settings.pinecone_api_key:
+        raise ValueError("PINECONE_API_KEY is not set in environment or .env file.")
+    return Pinecone(api_key=settings.pinecone_api_key)
 
 
-def build_vectorstore(
-    docs: Iterable[Document],
-    persist_directory: Path | str | None = None,
-):
-    """
-    과목 Document 리스트로부터 Chroma Vector DB 생성
+def _list_index_names(client: Pinecone) -> list[str]:
+    # 서버 버전에 따라 달라질 수 있는 list_indexes 응답을 문자열 리스트로 정규화
+    response = client.list_indexes()
+    if isinstance(response, dict) and "indexes" in response:
+        items = response["indexes"]
+        names: list[str] = []
+        for item in items:
+            if isinstance(item, dict):
+                names.append(item.get("name"))
+            else:
+                names.append(getattr(item, "name", None))
+        return [name for name in names if name]
 
-    ** 중요: 이 함수는 Vector DB를 처음 생성하거나 재생성할 때만 사용합니다 **
-    - 실행 시간이 오래 걸림 (문서 수백 개 이상일 경우 수 분 소요)
-    - 모든 과목을 임베딩으로 변환하고 Chroma DB에 저장
-    - 디스크에 영구 저장되므로 재실행 불필요
+    if hasattr(response, "indexes"):
+        return [idx.get("name") if isinstance(idx, dict)
+                else getattr(idx, "name", None)
+                for idx in getattr(response, "indexes")]  # type: ignore[arg-type]
 
-    ** 실행 방법 **
-    ```bash
-    # 터미널에서 직접 실행
-    python -m backend.rag.vectorstore
-    ```
+    if hasattr(response, "names") and callable(response.names):
+        return list(response.names())
 
-    Args:
-        docs: LangChain Document 리스트 (loader.py에서 생성됨)
-        persist_directory: Vector DB 저장 경로 (None이면 .env의 VECTORSTORE_DIR 사용)
+    if isinstance(response, list):
+        names = []
+        for item in response:
+            if isinstance(item, str):
+                names.append(item)
+            elif isinstance(item, dict):
+                names.append(item.get("name"))
+            else:
+                names.append(getattr(item, "name", None))
+        return [name for name in names if name]
 
-    Returns:
-        Chroma: 생성된 Vector Store 인스턴스
-    """
-    # 저장 디렉토리 경로 해석
-    persist_directory = _resolve_persist_dir(persist_directory)
-
-    # 임베딩 모델 로드 (OpenAI 또는 HuggingFace)
-    embeddings = get_embeddings()
-
-    # Chroma DB 생성
-    # - documents의 page_content를 임베딩으로 변환
-    # - 임베딩과 metadata를 함께 Chroma DB에 저장
-    # - persist_directory에 영구 저장 (SQLite 파일 생성)
-    vs = Chroma.from_documents(
-        documents=list(docs),          # Document 리스트를 리스트로 변환 (iterator 지원 안 함)
-        embedding=embeddings,           # 임베딩 모델
-        persist_directory=str(persist_directory),  # 저장 경로
-    )
-    return vs
+    return []
 
 
-def load_vectorstore(persist_directory: Path | str | None = None):
-    """
-    디스크에 저장된 Chroma Vector DB 로드 (싱글톤 패턴)
+def _infer_embedding_dimension(embeddings) -> int:
+    # 설정에 명시된 차원이 없으면 임베딩 모델에서 한 번 추론하여 차원을 구한다
+    settings = get_settings()
+    if settings.pinecone_dimension:
+        return settings.pinecone_dimension
+    probe_vector = embeddings.embed_query("major matching dimension probe")
+    return len(probe_vector)
 
-    build_vectorstore()로 생성한 Vector DB를 메모리에 로드합니다.
-    실제 검색 시에는 이 함수를 사용합니다 (빠름).
 
-    한 번 로드된 Vector Store는 전역 캐시에 저장되어 재사용됩니다.
-    이는 ChromaDB 1.3.4의 재초기화 버그를 방지하고 성능을 향상시킵니다.
+def _get_region_and_cloud(settings):
+    # serverless 인덱스 생성을 위해 region/cloud 정보를 읽어온다
+    region = settings.pinecone_region or settings.pinecone_environment
+    if not region:
+        raise ValueError("Set PINECONE_REGION or PINECONE_ENVIRONMENT for Pinecone.")
+    cloud = settings.pinecone_cloud or "aws"
+    return region, cloud
 
-    ** 주의사항 **
-    - build_vectorstore()와 같은 임베딩 모델을 사용해야 함
-    - 임베딩 모델이 다르면 벡터 차원 불일치로 오류 발생
-    - .env의 EMBEDDING_PROVIDER와 EMBEDDING_MODEL_NAME 확인 필수
 
-    Args:
-        persist_directory: Vector DB 저장 경로 (None이면 .env의 VECTORSTORE_DIR 사용)
+def _ensure_major_index(embeddings):
+    # Pinecone 인덱스가 없으면 생성하고 있으면 핸들을 재사용
+    global _MAJOR_INDEX_CACHE
+    if _MAJOR_INDEX_CACHE is not None:
+        return _MAJOR_INDEX_CACHE
 
-    Returns:
-        Chroma: 로드된 Vector Store 인스턴스 (검색 가능 상태)
-    """
-    global _VECTORSTORE_CACHE
+    settings = get_settings()
+    client = _get_pinecone_client()
+    index_name = settings.pinecone_index_name
+    existing = _list_index_names(client)
+    dimension = _infer_embedding_dimension(embeddings)
 
-    # 이미 로드된 인스턴스가 있으면 재사용 (싱글톤 패턴)
-    # 여러 툴이 호출되어도 Vector Store는 한 번만 로딩됨
-    # Lock을 사용하여 동시 접근 시 Chroma 인스턴스 생성을 직렬화
-    with _VECTORSTORE_LOCK:
-        if _VECTORSTORE_CACHE is not None:
-            return _VECTORSTORE_CACHE
-
-        # 저장 디렉토리 경로 해석
-        persist_directory = _resolve_persist_dir(persist_directory)
-
-        # 임베딩 모델 로드 (Vector DB 생성 시 사용한 것과 동일해야 함)
-        embeddings = get_embeddings()
-
-        # 디스크에서 Chroma DB 로드
-        # - persist_directory의 SQLite 파일과 벡터 데이터 읽기
-        # - embedding_function으로 새 쿼리를 임베딩하여 검색
-        _VECTORSTORE_CACHE = Chroma(
-            embedding_function=embeddings,
-            persist_directory=str(persist_directory),
+    if index_name not in existing:
+        region, cloud = _get_region_and_cloud(settings)
+        client.create_index(
+            name=index_name,
+            dimension=dimension,
+            metric="cosine",
+            spec=ServerlessSpec(cloud=cloud, region=region),
         )
 
-        return _VECTORSTORE_CACHE
+    _MAJOR_INDEX_CACHE = client.Index(index_name)
+    return _MAJOR_INDEX_CACHE
 
 
-if __name__ == "__main__":
-    """
-    Vector DB 빌드 스크립트
-
-    이 파일을 직접 실행하면 JSON 파일에서 과목 데이터를 읽어 Vector DB를 생성합니다.
-
-    ** 실행 방법 **
-    ```bash
-    python -m backend.rag.vectorstore
-    ```
-
-    ** 동작 과정 **
-    1. .env에서 RAW_JSON 경로 패턴 읽기 (예: backend/data/*.json)
-    2. 패턴에 매칭되는 모든 JSON 파일 로드
-    3. 각 파일의 과목 정보를 Document로 변환
-    4. 모든 Document를 Chroma DB에 저장 (VECTORSTORE_DIR)
-    """
-    from backend.rag.loader import load_courses
-
-    # 설정 로드
+def _get_major_namespace() -> str | None:
     settings = get_settings()
+    namespace = settings.pinecone_namespace
+    if namespace is None:
+        return None
+    namespace = namespace.strip()
+    return namespace or None
 
-    # RAW_JSON 패턴에 매칭되는 모든 파일 찾기
-    # 예: "backend/data/*.json" → [backend/data/file1.json, backend/data/file2.json, ...]
-    json_files = expand_paths(settings.raw_json)
+def get_major_index():
+    # LangChain 외부에서 직접 인덱스 핸들이 필요할 때 사용
+    embeddings = get_embeddings()
+    return _ensure_major_index(embeddings)
 
-    # 모든 JSON 파일에서 과목 데이터 로드
-    docs: list[Document] = []
-    for json_path in json_files:
-        print(f"Loading courses from {json_path}...")
-        docs.extend(load_courses(json_path))
 
-    # Vector DB 저장 경로
-    target_dir = _resolve_persist_dir(None)
+def get_major_vectorstore():
+    """
+    전공 추천에 특화된 Pinecone 기반 LangChain VectorStore를 싱글톤으로 반환한다.
 
-    # 빌드 시작
-    print(
-        f"\nBuilding vector store with {len(docs)} documents "
-        f"at '{target_dir}'..."
-    )
-    print("This may take a few minutes depending on the number of documents and embedding model speed...\n")
+    Index 핸들, 임베딩 모델, namespace 설정을 한 번만 구성한 뒤 재사용하여
+    불필요한 API 호출을 줄이고 스레드 안정성을 확보한다.
+    """
+    # LangChain VectorStore 인터페이스를 재사용하기 위해 싱글톤으로 구성
+    global _MAJOR_VECTORSTORE_CACHE
+    with _MAJOR_VECTORSTORE_LOCK:
+        if _MAJOR_VECTORSTORE_CACHE is not None:
+            return _MAJOR_VECTORSTORE_CACHE
 
-    build_vectorstore(docs, persist_directory=target_dir)
+        embeddings = get_embeddings()
+        index = _ensure_major_index(embeddings)
+        namespace = _get_major_namespace()
+        _MAJOR_VECTORSTORE_CACHE = PineconeVectorStore(
+            index=index,
+            embedding=embeddings,
+            text_key="text",
+            namespace=namespace,
+        )
+        return _MAJOR_VECTORSTORE_CACHE
 
-    print("\nVector store build complete!")
-    print(f"Saved to: {target_dir}")
+
+def clear_major_index(namespace: str | None = None):
+    """
+    Pinecone 인덱스에서 지정된 namespace를 전부 삭제한다.
+
+    Args:
+        namespace: 비우고 싶은 네임스페이스. None이면 기본값을 사용.
+    """
+    # 인덱스를 재구축하기 전 기존 벡터를 깨끗하게 제거
+    index = get_major_index()
+    delete_kwargs: dict[str, Any] = {"deleteAll": True}
+    namespace = namespace if namespace is not None else _get_major_namespace()
+    if namespace:
+        delete_kwargs["namespace"] = namespace
+    try:
+        index.delete(**delete_kwargs)
+    except NotFoundException:
+        # 삭제 대상 네임스페이스가 없으면 무시 (이미 비어있는 상태)
+        pass
+
+
+def index_major_docs(docs: list[MajorDoc]) -> int:
+    """
+    MajorDoc 리스트를 Pinecone 인덱스에 업서트하고 실제로 업로드한 문서 수를 반환한다.
+
+    Args:
+        docs: Pinecone에 저장할 전공 문서(요약, 과목, 진로 등) 목록
+
+    Returns:
+        업서트된 문서 수 (int)
+    """
+    vectorstore = get_major_vectorstore()
+
+    texts: list[str] = []
+    metadatas: list[dict[str, Any]] = []
+    ids: list[str] = []
+
+    for doc in docs:
+        texts.append(doc.text)
+        ids.append(doc.doc_id)
+
+        meta: dict[str, Any] = {
+            "major_id": doc.major_id,
+            "major_name": doc.major_name,
+            "doc_type": doc.doc_type,
+        }
+
+        # cluster: None이면 넣지 않기
+        if doc.cluster is not None and doc.cluster != "":
+            meta["cluster"] = doc.cluster
+
+        # salary: None이 아닐 때만 숫자로 넣기
+        if doc.salary is not None:
+            meta["salary"] = float(doc.salary)
+
+        # 태그 리스트: 비어있지 않을 때만 넣기 (list[str] 형태 유지)
+        if getattr(doc, "relate_subject_tags", None):
+            meta["relate_subject_tags"] = doc.relate_subject_tags
+
+        if getattr(doc, "job_tags", None):
+            meta["job_tags"] = doc.job_tags
+
+        metadatas.append(meta)
+
+    vectorstore.add_texts(texts=texts, metadatas=metadatas, ids=ids)
+    return len(docs)

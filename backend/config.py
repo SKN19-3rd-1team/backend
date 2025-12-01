@@ -35,7 +35,8 @@ class Settings:
     data_dir: str = os.getenv('DATA_DIR', 'backend/data')  # 데이터 디렉토리
     raw_json: str = os.getenv('RAW_JSON', 'backend/data/merged_university_courses.json')  # 원본 JSON 파일 (glob 패턴 지원)
     vector_store_path: str = os.getenv('VECTORSTORE_PATH', 'backend/data/processed/courses.parquet')  # 미사용 (레거시)
-    vectorstore_dir: str = os.getenv('VECTORSTORE_DIR', 'backend/data/chroma_db')  # Chroma DB 저장 경로
+    vectorstore_dir: str = os.getenv('VECTORSTORE_DIR', 'backend/data/vector_db')  # Vector DB 저장 경로
+    major_detail_path: str = os.getenv('MAJOR_DETAIL_PATH', 'backend/data/major_detail.json')  # 전공 세부 정보 데이터
 
     # LLM 설정
     llm_provider: str = os.getenv('LLM_PROVIDER', 'openai')  # LLM 제공자: openai, ollama, huggingface
@@ -44,6 +45,15 @@ class Settings:
     # 임베딩 설정
     embedding_model_name: str = os.getenv('EMBEDDING_MODEL_NAME', 'text-embedding-3-small')  # 임베딩 모델 (한국어 특화)
     embedding_provider: str = os.getenv('EMBEDDING_PROVIDER', 'openai')  # 임베딩 제공자: openai, huggingface
+
+    # Pinecone 설정 (전공 벡터 인덱스용)
+    pinecone_api_key: str = os.getenv('PINECONE_API_KEY', '')
+    pinecone_environment: str = os.getenv('PINECONE_ENVIRONMENT', '')
+    pinecone_region: str = os.getenv('PINECONE_REGION', '')
+    pinecone_cloud: str = os.getenv('PINECONE_CLOUD', 'aws')
+    pinecone_index_name: str = os.getenv('PINECONE_INDEX_NAME', 'majors-index')
+    pinecone_namespace: str = os.getenv('PINECONE_NAMESPACE', 'majors')
+    pinecone_dimension: int = int(os.getenv('PINECONE_DIMENSION', '0') or '0')
 
 
 def get_settings() -> Settings:

@@ -9,7 +9,7 @@
 __pycache__
 
 # data
-backend/data/chroma_db
+backend/data/vector_db
 backend/data/
 
 # AGENTS
