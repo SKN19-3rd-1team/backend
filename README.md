@@ -23,7 +23,7 @@
 3. **벡터스토어 구축**
 
    ```bash
-   python -m backend.rag.vectorstore
+   python -m backend.rag.build_major_index
    ```
 
    - `.env`의 `RAW_JSON`(glob 가능)에서 코스를 읽어 LangChain `Document`로 변환하고, `VECTORSTORE_DIR` 경로에 Chroma DB를 생성/갱신합니다.
