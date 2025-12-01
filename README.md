@@ -26,7 +26,7 @@
    python -m backend.rag.build_major_index
    ```
 
-   - `.env`의 `RAW_JSON`(glob 가능)에서 코스를 읽어 LangChain `Document`로 변환하고, `VECTORSTORE_DIR` 경로에 Chroma DB를 생성/갱신합니다.
+   - `.env`의 `RAW_JSON`(glob 가능)에서 코스를 읽어 LangChain `Document`로 변환하고, `VECTORSTORE_DIR` 경로에 Vector DB를 생성/갱신합니다.
    - 원본 데이터나 임베딩 모델 설정을 바꿨다면 이 명령을 다시 실행하세요.
 
 4. **Streamlit 챗봇 실행**
@@ -151,7 +151,7 @@ results = run_major_recommendation({
 - **backend**
   - LangGraph + LangChain RAG 파이프라인 전체를 담당합니다.
   - `config.py`는 모든 경로 및 모델 설정을 중앙에서 관리하며, `.env` 기반으로 LLM/임베딩을 선택합니다.
-  - `rag/loader.py`는 JSON 데이터를 LangChain `Document`로 변환하고, `rag/vectorstore.py`는 Chroma 벡터스토어를 생성·로드합니다.
+  - `rag/loader.py`는 JSON 데이터를 LangChain `Document`로 변환하고, `rag/vectorstore.py`는 Vector 벡터스토어를 생성·로드합니다.
   - `rag/tools.py`는 `@tool` 데코레이터로 LLM이 호출할 수 있는 tool을 정의합니다.
   - `graph/` 폴더에는 RAG 파이프라인을 LangGraph로 정의한 노드, 상태, 그래프 빌더가 들어 있습니다.
 
