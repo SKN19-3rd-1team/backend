@@ -12,7 +12,7 @@ from .graph.graph_builder import build_graph
 # 그래프 캐싱을 위한 전역 변수
 # 그래프 빌드는 비용이 높으므로, 한 번 빌드한 그래프를 재사용합니다.
 _graph_react = None
-_graph_structured = None
+_graph_major = None
 
 def get_graph(mode: str = "react"):
     """
@@ -23,7 +23,6 @@ def get_graph(mode: str = "react"):
     Args:
         mode: 그래프 실행 모드
             - "react": ReAct 에이전트 방식 (기본값)
-            - "structured": Structured Output 방식
 
     Returns:
         Compiled LangGraph application
@@ -31,16 +30,16 @@ def get_graph(mode: str = "react"):
     Raises:
         ValueError: 지원하지 않는 mode가 입력된 경우
     """
-    global _graph_react, _graph_structured
+    global _graph_react, _graph_major
 
     if mode == "react":
         if _graph_react is None:
             _graph_react = build_graph(mode="react")
         return _graph_react
-    elif mode == "structured":
-        if _graph_structured is None:
-            _graph_structured = build_graph(mode="structured")
-        return _graph_structured
+    elif mode == "major":
+        if _graph_major is None:
+            _graph_major = build_graph(mode="major")
+        return _graph_major
     else:
         raise ValueError(f"Unknown mode: {mode}")
 
@@ -52,9 +51,6 @@ def run_mentor(question: str, interests: str | None = None, mode: str = "react",
     ```python
     # ReAct 모드 (기본)
     answer = run_mentor("인공지능 관련 과목 추천해줘")
-
-    # Structured 모드
-    answer = run_mentor("데이터베이스 과목 알려줘", mode="structured")
     ```
 
     Args:
@@ -62,7 +58,6 @@ def run_mentor(question: str, interests: str | None = None, mode: str = "react",
         interests: 학생의 관심사/진로 방향 (선택, 현재 미사용)
         mode: 실행 모드
             - "react": ReAct 에이전트 방식 (기본값, LLM이 tool 호출 자율 결정)
-            - "structured": Structured Output 방식 (고정 파이프라인)
 
     Returns:
         LLM이 생성한 최종 답변 문자열
@@ -103,18 +98,32 @@ def run_mentor(question: str, interests: str | None = None, mode: str = "react",
             return last_message.content
         return "답변을 생성할 수 없습니다."
 
-    elif mode == "structured":
-        # ==================== Structured 모드 ====================
-        # question 기반 상태 초기화
-        state = {
-            "question": question,
-            "interests": interests,
-            "retrieved_docs": [],  # retrieve_node에서 채워짐
-            "answer": None,  # answer_node에서 채워짐
+
+def run_major_recommendation(onboarding_answers: dict, question: str | None = None) -> dict:
+    """
+    온보딩 단계에서 수집한 정보를 기반으로 Pinecone 전공 추천을 실행합니다.
+
+    Args:
+        onboarding_answers: 선호 과목, 취미, 희망 연봉, 희망 학과 등 사용자 입력
+        question: 선택 사항, 추가 맥락으로 사용할 마지막 사용자 발화
+
+    Returns:
+        {
+            "user_profile_text": "...",
+            "recommended_majors": [...],
+            "major_scores": {...},
+            "major_search_hits": [...],
         }
-
-        # 그래프 실행: retrieve → select → answer 순차 실행
-        final_state = graph.invoke(state)
-
-        # answer_node가 생성한 최종 답변 반환
-        return final_state["answer"]
+    """
+    graph = get_graph(mode="major")
+    state = {
+        "onboarding_answers": onboarding_answers,
+        "question": question,
+    }
+    final_state = graph.invoke(state)
+    return {
+        "user_profile_text": final_state.get("user_profile_text"),
+        "recommended_majors": final_state.get("recommended_majors", []),
+        "major_scores": final_state.get("major_scores", {}),
+        "major_search_hits": final_state.get("major_search_hits", []),
+    }
