@@ -135,6 +135,7 @@ def _summarize_major_hits(hits, aggregated_scores, limit: int = 10):
                 "sample_docs": [],
                 "relate_subject_tags": [],
                 "job_tags": [],
+                "summary": "",  # summary 필드 추가
             },
         )
 
@@ -151,6 +152,10 @@ def _summarize_major_hits(hits, aggregated_scores, limit: int = 10):
                     "text": hit.text,
                 }
             )
+
+        # summary doc_type인 경우 summary 필드에 저장
+        if hit.doc_type == "summary" and not entry["summary"]:
+            entry["summary"] = hit.text
 
         entry["relate_subject_tags"] = _merge_tag_lists(
             entry["relate_subject_tags"],

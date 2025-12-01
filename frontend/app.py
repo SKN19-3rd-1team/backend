@@ -240,10 +240,12 @@ def render_major_recommendations_section():
                     st.write(f"- 주요 근거: {doc_types}")
                 if tags:
                     st.write(f"- 연관 과목 태그: {', '.join(tags)}")
-                samples = major.get("sample_docs", [])
-                if samples:
-                    st.caption("상세 설명 예시")
-                    st.markdown(samples[0]["text"])
+                
+                # summary 필드 표시
+                summary_text = major.get("summary", "")
+                if summary_text:
+                    st.caption("상세 설명")
+                    st.markdown(summary_text)
 
     rerun_col1, rerun_col2 = st.columns([1, 4])
     with rerun_col1:
@@ -267,11 +269,11 @@ def sync_major_summary_message():
         return
 
     lines = []
-    for idx, major in enumerate(recs[:3], start=1):
+    for idx, major in enumerate(recs[:5], start=1):
         score = major.get("score", 0.0)
         lines.append(f"{idx}. {major['major_name']} (점수 {score:.2f})")
     summary_text = (
-        "온보딩 답변을 바탕으로 추천 전공 TOP 3를 정리했어요:\n"
+        "온보딩 답변을 바탕으로 추천 전공 TOP 5를 정리했어요:\n"
         + "\n".join(lines)
         + "\n\n필요하면 위 전공 중 궁금한 학과를 지정해서 더 물어봐도 좋아요!"
     )
