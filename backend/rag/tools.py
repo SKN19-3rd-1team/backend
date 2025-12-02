@@ -901,19 +901,23 @@ def _format_department_output(
 @tool
 def list_departments(query: str, top_k: int = DEFAULT_SEARCH_LIMIT) -> str:
     """
-    Pinecone majors vector DB를 기반으로 학과 목록을 조회합니다.
-    
-    사용 시나리오:
-    - query = "전체" → 전체 전공 목록을 반환 (상위 top_k까지만 표시)
-    - query = "컴퓨터 / 소프트웨어 / 인공지능" → 해당 키워드와 유사한 전공을 검색
-    - query = "컴공" 등 별칭 → major_detail.json에서 추출한 별칭 매핑/벡터 검색으로 정규화
-    
-    Args:
-        query: 검색 쿼리 (전공 분야, 키워드, 별칭 등)
-        top_k: 반환할 최대 학과 수 (기본값: 10)
-        
-    Returns:
-        포맷팅된 학과 목록 문자열 (학과명 + 개설 대학 예시 포함)
+    Pinecone majors vector DB를 기반으로 학과 목록을 조회하고 추천하는 툴입니다.
+
+    이 툴을 호출해야 하는 상황 (LLM용 가이드):
+    - 사용자가
+      - "어떤 학과들이 있어?", "컴퓨터 관련 학과 알려줘"
+      - "나의 관심사는 ~인데 어떤 전공이 좋을까?" (관심사 키워드로 검색)
+      - "~와 비슷한 전공 추천해줘"
+      와 같이 **전공/학과 목록 탐색**을 요청할 때 사용하세요.
+    - 특정 학과의 상세 정보(진로, 연봉 등)나 개설 대학을 묻는 질문에는 이 툴이 아니라
+      `get_major_career_info`나 `get_universities_by_department`를 사용해야 합니다.
+
+    파라미터 설명:
+    - query:
+        검색하고 싶은 전공 분야, 관심사 키워드, 또는 "전체".
+        예: "인공지능", "로봇", "경영", "전체"
+    - top_k:
+        반환할 학과 개수. 기본값은 10입니다.
     """
     raw_query = (query or "").strip()
     _log_tool_start("list_departments", f"학과 목록 조회 - query='{raw_query or '전체'}', top_k={top_k}")
@@ -995,25 +999,20 @@ def list_departments(query: str, top_k: int = DEFAULT_SEARCH_LIMIT) -> str:
 @tool
 def get_major_career_info(major_name: str) -> Dict[str, Any]:
     """
-    특정 전공(major)에 대한 세분화된 진출 직업 목록과 진출 분야 설명을 반환합니다.
-    추가로 추천 활동, 관련 자격증, 주요 전공 과목 정보도 함께 제공합니다.
+    특정 전공(major)에 대한 상세 정보(진로, 연봉, 자격증, 주요 과목 등)를 조회하는 툴입니다.
 
-    Args:
-        major_name: 전공명 또는 별칭 (예: "컴퓨터공학과", "AI융합학부")
+    이 툴을 호출해야 하는 상황 (LLM용 가이드):
+    - 사용자가
+      - "컴퓨터공학과에 대해 알려줘" (단일 학과명 질문의 첫 단계)
+      - "이 학과 나오면 무슨 일 해?", "졸업 후 진로가 어떻게 돼?"
+      - "연봉은 얼마나 받아?"
+      - "어떤 자격증이 필요해?", "무엇을 배워?"
+      와 같이 **특정 학과의 상세 정보**를 물을 때 사용하세요.
 
-    Returns:
-        진로 정보 딕셔너리
-        {
-            "major": "컴퓨터공학과",
-            "jobs": ["3D프린팅전문가", ...],
-            "job_summary": "3D프린팅전문가, ...",
-            "enter_field": [{"category": "기업 및 산업체", "description": "..."}, ...],
-            "career_act": [{"act_name": "건축박람회", "act_description": "..."}, ...],
-            "qualifications": "건축기사, ...",
-            "qualifications_list": ["건축기사", ...],
-            "main_subject": [{"SBJECT_NM": "건축구조시스템", "SBJECT_SUMRY": "..."}, ...],
-            "source": "backend/data/major_detail.json"
-        }
+    파라미터 설명:
+    - major_name:
+        정보를 조회할 학과명.
+        예: "컴퓨터공학과", "경영학과"
     """
     query = (major_name or "").strip()
     _log_tool_start("get_major_career_info", f"전공 진로 정보 조회 - major='{query}'")
@@ -1115,22 +1114,21 @@ def get_major_career_info(major_name: str) -> Dict[str, Any]:
 @tool
 def get_universities_by_department(department_name: str) -> List[Dict[str, str]]:
     """
-    특정 학과가 있는 대학 목록을 조회합니다.
+    특정 학과를 개설한 대학 목록을 조회하는 툴입니다.
 
-    사용 시나리오:
-    - 학생이 특정 학과를 선택한 후, 해당 학과가 있는 대학들을 보여줄 때 사용
-    - 예: "컴퓨터공학과"를 선택하면 → 서울대, 연세대, 고려대 등 목록 제공
+    이 툴을 호출해야 하는 상황 (LLM용 가이드):
+    - 사용자가
+      - "컴퓨터공학과는 어느 대학에 있어?"
+      - "서울에 있는 심리학과 대학 알려줘"
+      - "고분자공학과 개설 대학 보여줘"
+      와 같이 **특정 학과의 개설 대학 정보**를 요청할 때 사용하세요.
+    - 단일 학과명 질문("컴퓨터공학과")이 들어왔을 때, `get_major_career_info` 호출 후
+      이 툴을 연달아 호출하여 대학 정보도 함께 제공하면 좋습니다.
 
-    Args:
-        department_name: 학과명 (예: "컴퓨터공학과", "소프트웨어학부")
-
-    Returns:
-        대학 정보 리스트
-        [
-            {"university": "서울대학교", "college": "공과대학", "department": "컴퓨터공학과"},
-            {"university": "연세대학교", "college": "공과대학", "department": "컴퓨터공학과"},
-            ...
-        ]
+    파라미터 설명:
+    - department_name:
+        대학 목록을 찾고 싶은 학과명.
+        예: "컴퓨터공학과", "심리학과"
     """
     query = (department_name or "").strip()
     _log_tool_start("get_universities_by_department", f"학과별 대학 조회 - department='{query}'")
@@ -1194,16 +1192,14 @@ def get_universities_by_department(department_name: str) -> List[Dict[str, str]]
 @tool
 def get_search_help() -> str:
     """
-    사용자 질문에 대한 정보를 가져올 수 없었을 때 사용하는 툴입니다.
-    검색 가능한 방법들(각 툴을 호출할 수 있는 방법들)을 안내합니다.
+    사용자의 질문을 처리할 적절한 툴을 찾지 못했거나, 검색 결과가 없을 때 도움말을 제공하는 툴입니다.
 
-    사용 시나리오:
-    1. 다른 툴(list_departments, get_universities_by_department)의 결과가 비어있을 때
-    2. 사용자의 질문이 너무 모호하거나 데이터베이스에 없는 정보를 요청할 때
-    3. 검색 결과가 없어서 사용자에게 다른 검색 방법을 안내해야 할 때
+    이 툴을 호출해야 하는 상황 (LLM용 가이드):
+    - 사용자의 질문이 너무 모호하여 어떤 툴을 써야 할지 판단이 서지 않을 때
+    - 다른 툴을 호출했으나 결과가 비어있어("검색 결과 없음"), 사용자에게 검색 팁을 줘야 할 때
+    - 사용자가 "어떻게 검색해야 해?", "도움말 보여줘"라고 직접 요청할 때
 
-    Returns:
-        검색 가능한 방법들을 설명하는 가이드 메시지
+    이 툴은 별도의 파라미터 없이 호출하면 됩니다.
     """
     _log_tool_start("get_search_help", "검색 가이드 안내")
     print("ℹ️  Using get_search_help tool - providing usage guide to user")
