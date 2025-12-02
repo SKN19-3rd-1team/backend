@@ -10,7 +10,7 @@ __pycache__
 
 # data
 backend/data/vector_db
-backend/data/
+# backend/data/
 
 # AGENTS
 AGENTS.md

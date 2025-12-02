@@ -179,6 +179,154 @@ results = run_major_recommendation({
 3. **동적 로딩**:
    - `backend/rag/tools.py`는 실행 시 `major_categories.json`을 로드하여 최신 카테고리 정보를 반영합니다.
 
+## 데이터 아키텍처 및 메타데이터 구조
+
+이 프로젝트는 **2단계 데이터 저장 전략**을 사용하여 효율적인 검색과 상세 정보 조회를 동시에 지원합니다.
+
+### 메타데이터 구조
+
+전공 정보는 `MajorDoc` 클래스를 통해 Pinecone 벡터 데이터베이스에 저장되며, 다음과 같은 메타데이터를 포함합니다:
+
+```python
+@dataclass
+class MajorDoc:
+    doc_id: str                    # 문서 고유 ID (예: "컴퓨터공학:summary")
+    major_id: str                  # 전공 고유 ID
+    major_name: str                # 전공명
+    doc_type: str                  # 문서 타입 (summary, interest, property, subjects, jobs)
+    text: str                      # 임베딩할 텍스트 내용
+    cluster: Optional[str]         # 전공 클러스터 분류
+    salary: Optional[float]        # 평균 급여 정보
+    relate_subject_tags: list[str] # 관련 과목 태그 리스트
+    job_tags: list[str]            # 진출 직업 태그 리스트
+    raw_subjects: Optional[str]    # 원본 과목 정보
+    raw_jobs: Optional[str]        # 원본 직업 정보
+```
+
+### 문서 타입 (doc_type) 분류
+
+각 전공은 여러 개의 문서로 분해되어 저장됩니다:
+
+- **`summary`**: 전공 요약 설명
+- **`interest`**: 흥미/적성 정보 + 추천 활동
+- **`property`**: 전공 특성
+- **`subjects`**: 관련 과목 안내
+- **`jobs`**: 진출 직업 및 분야
+
+### 데이터 흐름 구조
+
+```
+major_detail.json (원본 데이터)
+        ↓
+load_major_detail() [backend/rag/loader.py]
+        ↓
+MajorRecord 객체 생성 (raw 필드에 전체 데이터 보관)
+        ↓
+┌───────────────────┬────────────────────┐
+│                   │                    │
+Pinecone 업로드      메모리 캐시           직접 조회
+(메타데이터만)       (_MAJOR_RECORDS_CACHE)  (tools.py)
+```
+
+### 2단계 데이터 저장 전략
+
+#### 1단계: Pinecone 벡터 데이터베이스 (검색용)
+
+**저장 데이터:**
+- 메타데이터: `doc_id`, `major_id`, `major_name`, `doc_type`, `cluster`, `salary`, `relate_subject_tags`, `job_tags`
+- 임베딩 벡터: `text` 필드를 임베딩한 벡터
+
+**용도:**
+- 의미 기반 유사도 검색
+- 빠른 전공 필터링 및 매칭
+
+**예시:**
+```python
+# "AI 관련 전공 찾기"와 같은 의미 기반 검색
+results = vectorstore.similarity_search("인공지능 관련 전공")
+```
+
+#### 2단계: 메모리 캐시 (상세 정보용)
+
+**저장 데이터:**
+- 전체 `MajorRecord` 객체 (모든 원본 데이터 포함)
+- `raw` 필드에 `major_detail.json`의 원본 JSON 데이터 전체 보관
+
+**용도:**
+- 상세 정보 조회 (대학 목록, 자격증, 주요 과목 등)
+- Pinecone에 저장되지 않은 추가 정보 제공
+
+**캐싱 메커니즘:**
+```python
+# backend/rag/tools.py
+_MAJOR_RECORDS_CACHE = None  # 전체 MajorRecord 리스트
+_MAJOR_ID_MAP = {}           # major_id로 빠른 조회
+_MAJOR_NAME_MAP = {}         # 전공명으로 빠른 조회
+_MAJOR_ALIAS_MAP = {}        # 별칭으로 빠른 조회
+
+def _ensure_major_records():
+    """첫 호출 시 major_detail.json을 로드하여 메모리에 캐싱"""
+    global _MAJOR_RECORDS_CACHE
+    if _MAJOR_RECORDS_CACHE is not None:
+        return
+    
+    records = load_major_detail()  # 전체 원본 데이터 로드
+    _MAJOR_RECORDS_CACHE = records
+    # 인덱스 생성...
+```
+
+### 실제 사용 흐름
+
+```python
+# 1단계: Pinecone으로 관련 전공 검색 (벡터 유사도)
+results = vectorstore.similarity_search("AI 관련 전공")
+
+# 2단계: 검색된 전공의 major_id로 상세 정보 조회
+record = _MAJOR_ID_MAP[major_id]
+
+# 3단계: 원본 데이터의 모든 필드 활용
+university_list = record.university      # Pinecone에 없는 정보
+chart_data = record.chart_data          # Pinecone에 없는 정보
+employment_rate = record.employment     # Pinecone에 없는 정보
+raw_json = record.raw                   # 전체 원본 JSON
+```
+
+### 메타데이터 활용 예시
+
+#### 필터링 및 정렬
+```python
+# 급여 정보를 기반으로 필터링
+high_salary_majors = [doc for doc in docs if doc.salary and doc.salary > 4000]
+
+# 클러스터별 그룹화
+engineering_majors = [doc for doc in docs if doc.cluster == "공학계열"]
+```
+
+#### 태그 기반 매칭
+```python
+# 사용자가 선택한 과목과 매칭
+user_subjects = ["수학", "물리"]
+matched = [doc for doc in docs 
+           if any(subj in doc.relate_subject_tags for subj in user_subjects)]
+```
+
+### 왜 이렇게 설계했을까?
+
+| 구분 | Pinecone (벡터 DB) | 메모리 캐시 (MajorRecord) |
+|------|-------------------|------------------------|
+| **용도** | 의미 기반 검색 | 상세 정보 조회 |
+| **저장 데이터** | 메타데이터 + 임베딩 | **전체 원본 데이터** |
+| **장점** | 빠른 유사도 검색 | 모든 필드 접근 가능 |
+| **예시** | "AI 관련 전공 찾기" | "컴퓨터공학과의 자격증 목록" |
+| **크기** | 가볍고 효율적 | 전체 데이터 보관 |
+
+### 관련 파일
+
+- **`backend/rag/loader.py`**: `MajorRecord`, `MajorDoc` 클래스 정의 및 데이터 로딩
+- **`backend/rag/tools.py`**: 메모리 캐시 관리 및 상세 정보 조회 툴
+- **`backend/rag/vectorstore.py`**: Pinecone 벡터 데이터베이스 관리
+- **`backend/data/major_detail.json`**: 원본 전공 데이터
+
 ## LLM/Embedding 모델 변경 방법
 
 이 프로젝트는 **LLM 모델**과 **Embedding 모델**을 각각 독립적으로 설정할 수 있습니다.
