@@ -98,11 +98,15 @@ def get_llm():
             return ChatOpenAI(
                 model=settings.model_name,
                 base_url=base_url,  # OpenAI 호환 API 서버 주소
-                api_key=settings.openai_api_key
+                api_key=settings.openai_api_key,
+                temperature=0.1,  # 툴 호출 신뢰성을 위해 낮은 온도 사용
             )
         else:
             # 공식 OpenAI API 사용
-            return ChatOpenAI(model=settings.model_name)
+            return ChatOpenAI(
+                model=settings.model_name,
+                temperature=0.1,  # 툴 호출 신뢰성을 위해 낮은 온도 사용
+            )
 
     elif provider == "ollama":
         # 로컬 또는 원격 Ollama 서버 사용

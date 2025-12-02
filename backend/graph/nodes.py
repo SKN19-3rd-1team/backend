@@ -184,6 +184,7 @@ def _summarize_major_hits(hits, aggregated_scores, limit: int = 10):
 def recommend_majors_node(state: MentorState) -> dict:
     """
     Build a user profile embedding from onboarding answers and rank majors.
+    우선순위: preferred_majors 정확 매칭 > 벡터 유사도 검색
     """
     onboarding_answers = state.get("onboarding_answers") or {}
     profile_text = _build_user_profile_text(onboarding_answers, state.get("question"))
@@ -202,6 +203,48 @@ def recommend_majors_node(state: MentorState) -> dict:
 
     hits = search_major_docs(profile_embedding, top_k=50)
     aggregated_scores = aggregate_major_scores(hits, MAJOR_DOC_WEIGHTS)
+    
+    # 🎯 preferred_majors 우선 처리
+    preferred_majors = onboarding_answers.get("preferred_majors")
+    preferred_major_ids = set()
+    
+    if preferred_majors:
+        # preferred_majors를 문자열 또는 리스트로 처리
+        if isinstance(preferred_majors, str):
+            preferred_list = [m.strip() for m in preferred_majors.split(",") if m.strip()]
+        elif isinstance(preferred_majors, list):
+            preferred_list = [str(m).strip() for m in preferred_majors if str(m).strip()]
+        else:
+            preferred_list = []
+        
+        if preferred_list:
+            # tools.py의 검색 함수 사용하여 선호 전공 별도 검색
+            from backend.rag.tools import _find_majors, _MAJOR_ID_MAP, _ensure_major_records
+            _ensure_major_records()
+            
+            for preferred in preferred_list:
+                print(f"🔍 Searching for preferred major: '{preferred}'")
+                
+                # 선호 전공 검색 (정확 매칭 + 벡터 검색)
+                preferred_matches = _find_majors(preferred, limit=5)
+                
+                for record in preferred_matches:
+                    if not record.major_id:
+                        continue
+                    
+                    preferred_major_ids.add(record.major_id)
+                    
+                    # 기존 hits에 없으면 추가
+                    if record.major_id not in aggregated_scores:
+                        # 새로운 전공이므로 기본 점수 1.0 부여
+                        aggregated_scores[record.major_id] = 1.0
+                        print(f"✅ Added preferred major '{record.major_name}' to results")
+                    
+                    # 보너스 점수 적용 (5배로 강화)
+                    original_score = aggregated_scores[record.major_id]
+                    aggregated_scores[record.major_id] = original_score * 5.0
+                    print(f"🎯 Boosted '{record.major_name}' score: {original_score:.2f} → {aggregated_scores[record.major_id]:.2f}")
+    
     recommended = _summarize_major_hits(hits, aggregated_scores)
 
     serialized_hits = [
@@ -242,15 +285,36 @@ def agent_node(state: MentorState) -> dict:
         system_message = SystemMessage(content=f"""
 당신은 학생들의 전공 선택을 돕는 '대학 전공 탐색 멘토'입니다. 모든 답변은 한국어로 작성하세요.
 
-[핵심 원칙]
-1. Tool(list_departments, get_universities_by_department, get_major_career_info)이 돌려준 학과/대학/직업 이름은 **문자 하나도 바꾸지 말고 그대로 사용**합니다. 새로운 명칭을 추측으로 만들지 마세요.
-2. 전공 관련 질문에는 반드시 적절한 툴을 tool_calls로 호출해 근거를 확보한 뒤 답변하세요.
-3. 학과 정보를 소개할 때는 가능하면 학과명과 그 학과를 개설한 대학 이름을 함께 보여주세요. list_departments의 "개설 대학 예시"나 get_universities_by_department 결과를 적극 활용합니다.
+[🚨 절대 규칙 - 반드시 준수]
+1. **툴에서 반환된 학과/대학/직업 이름만 사용**: Tool(list_departments, get_universities_by_department, get_major_career_info)이 돌려준 학과/대학/직업 이름은 **문자 하나도 바꾸지 말고 그대로 사용**합니다.
+2. **절대 추측 금지**: 데이터베이스에 없는 학과명, 대학명, 직업명을 절대로 만들어내거나 추측하지 마세요. 
+3. **툴 호출 필수**: 전공/학과/대학 관련 질문에는 반드시 적절한 툴을 tool_calls로 호출해 근거를 확보한 뒤 답변하세요.
+4. **데이터 출처 명시**: 데이터 출처가 "커리어 넷"임을 자연스럽게 언급하세요.
+
+[학과명 단일 입력 처리 - 매우 중요!]
+- 학생이 "고분자공학과", "컴퓨터공학", "경영학과" 등 **학과명만 단독으로 입력한 경우**:
+  1. **절대로 "찾을 수 없다"고 답변하지 마세요**
+  2. **반드시 get_major_career_info 툴을 먼저 호출**하여 해당 학과 정보를 확인하세요
+  3. 툴 호출 결과를 바탕으로 학과 소개, 진로, 연봉 등을 종합적으로 안내하세요
+  4. 추가로 get_universities_by_department를 호출하여 개설 대학도 함께 제공하세요
+- 예시: "고분자공학과" 입력 → get_major_career_info("고분자공학과") + get_universities_by_department("고분자공학과") 호출
+
+[유사 전공 추천 - 중요]
+- "~와 비슷한", "~와 유사한", "다른 전공 추천해줘" 등의 질문을 받으면:
+  1. **반드시 list_departments 툴을 호출**하여 실제 존재하는 전공을 검색하세요
+  2. 검색 키워드: 해당 전공의 핵심 키워드를 추출하여 검색 (예: "국어교육과" → "교육", "국어", "언어" 등)
+  3. **툴 결과에 없는 전공은 절대 언급 금지** - "영어치료학과", "아동언어치료학과" 같은 존재하지 않는 학과를 만들지 마세요
+  4. 적합한 전공을 찾지 못하면 "죄송합니다. 현재 데이터베이스에서 관련 전공을 찾지 못했습니다."라고 솔직하게 답변하세요
 
 [진로/직업 정보 제공]
 - "졸업 후 진로", "어떤 직업"과 같이 직업/취업을 묻는 질문은 무조건 get_major_career_info를 호출해 major_detail.json의 `job`/`enter_field` 데이터를 가져오세요.
 - 반환된 `jobs` 리스트(예: 3D프린팅전문가, 가상현실전문가 등)를 그대로 나열하고, `enter_field` 설명을 바탕으로 분야별 진출처를 요약합니다.
-- 데이터 출처가 "커리어 넷"임을 자연스럽게 언급하고, 추측으로 목록을 추가하지 마세요.
+- 데이터 출처가 "커리어 넷"임을 자연스럽게 언급하고, 모든 응답에 대해 추측으로 목록을 추가하지 마세요.
+
+[연봉 정보 제공]
+- 연봉이나 수입을 묻는 질문에는 get_major_career_info 결과의 `annual_salary` 값을 확인하세요.
+- 값이 있다면 반드시 다음 형식을 정확히 지켜서 답변하세요: "**학과명**을(를) 졸업시 평균 연봉은 **annual_salary**만원 정도입니다!"
+- 만약 `annual_salary` 값이 없다면 "해당 학과의 연봉 데이터가 없습니다."라고 답변하세요.
 
 [관심사 기반 추천 절차]
 1. 학생이 입력한 관심사를 쉼표(,)나 슬래시(/)로 분리해 키워드 목록을 만듭니다.
@@ -259,6 +323,7 @@ def agent_node(state: MentorState) -> dict:
 
 [대학 정보 제공]
 - 특정 학과가 어느 대학에 있는지 묻는다면 즉시 get_universities_by_department를 호출해 대학/학과 쌍을 그대로 전달하세요.
+- 학과 정보를 소개할 때는 가능하면 학과명과 그 학과를 개설한 대학 이름을 함께 보여주세요.
 
 [응답 방식]
 - 항상 툴 결과를 바탕으로 친절하고 구조화된 설명을 제공합니다.
@@ -269,6 +334,29 @@ def agent_node(state: MentorState) -> dict:
 """)
                                        
     messages = [system_message] + messages
+    
+    # 🔍 입력 전처리: 단일 학과명 질문 감지 및 개선
+    from backend.graph.helper import is_single_major_query, enhance_single_major_query
+    
+    # 마지막 사용자 메시지 확인
+    last_user_msg = None
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage):
+            last_user_msg = msg
+            break
+    
+    # 단일 학과명 질문이면 자동으로 명확한 질문으로 변환
+    if last_user_msg and is_single_major_query(last_user_msg.content):
+        original_query = last_user_msg.content
+        enhanced_query = enhance_single_major_query(original_query)
+        print(f"🔍 Detected single major query: '{original_query}'")
+        print(f"✨ Enhanced to: '{enhanced_query}'")
+        
+        # 마지막 사용자 메시지를 개선된 버전으로 교체
+        for i in range(len(messages) - 1, -1, -1):
+            if isinstance(messages[i], HumanMessage) and messages[i] == last_user_msg:
+                messages[i] = HumanMessage(content=enhanced_query)
+                break
 
     response = llm_with_tools.invoke(messages)
 
