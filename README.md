@@ -23,10 +23,10 @@
 3. **벡터스토어 구축**
 
    ```bash
-   python -m backend.rag.vectorstore
+   python -m backend.rag.build_major_index
    ```
 
-   - `.env`의 `RAW_JSON`(glob 가능)에서 코스를 읽어 LangChain `Document`로 변환하고, `VECTORSTORE_DIR` 경로에 Chroma DB를 생성/갱신합니다.
+   - `.env`의 `RAW_JSON`(glob 가능)에서 코스를 읽어 LangChain `Document`로 변환하고, `VECTORSTORE_DIR` 경로에 Vector DB를 생성/갱신합니다.
    - 원본 데이터나 임베딩 모델 설정을 바꿨다면 이 명령을 다시 실행하세요.
 
 4. **Streamlit 챗봇 실행**
@@ -45,7 +45,7 @@ major-mentor-bot/
 ├─ backend/
 │  ├─ data/
 │  │  ├─ raw/
-│  │  │  └─ *.json         # 원본 JSON
+│  │  │  └─ *.json                        # 원본 JSON
 │  │  └─ processed/
 │  │     └─ courses.parquet               # 전처리/캐시(optional)
 │  ├─ graph/
@@ -75,9 +75,9 @@ major-mentor-bot/
 
 ## 프로젝트 작동 방식
 
-이 프로젝트는 **두 가지 다른 RAG 패턴**을 지원합니다:
+이 프로젝트는 **두 가지 주요 워크플로우**를 지원합니다:
 
-### 1. ReAct 패턴 (기본값, Agentic)
+### 1. ReAct 패턴 (대화형 멘토링)
 
 **LLM이 자율적으로 tool 호출 여부를 결정하는 에이전트 방식**
 
@@ -92,81 +92,58 @@ major-mentor-bot/
 **작동 순서:**
 
 1. 사용자가 질문 입력 (예: "인공지능 관련 과목 추천해줘")
-2. `agent_node`: LLM이 질문을 분석하고 "과목 정보가 필요하다"고 판단
-3. LLM이 `retrieve_courses` tool 호출 결정 (tool_calls 포함하여 응답)
+2. `agent_node`: LLM이 질문을 분석하고 정보가 필요한지 판단
+3. LLM이 적절한 tool (`list_departments`, `get_universities_by_department` 등) 호출 결정
 4. `should_continue`: tool_calls 감지 → tools 노드로 라우팅
-5. `tools` 노드: `retrieve_courses` 함수 실행 → 벡터 DB에서 과목 검색
-6. `agent_node`로 복귀: LLM이 검색 결과 보고 최종 답변 생성
+5. `tools` 노드: 선택된 툴 실행 (학과 검색, 대학 찾기 등)
+6. `agent_node`로 복귀: LLM이 툴 결과를 바탕으로 답변 생성
 7. `should_continue`: tool_calls 없음 → 종료
 
 **핵심 파일:**
 
-- `backend/rag/tools.py`: `@tool` 데코레이터로 정의된 LangChain tool
+- `backend/rag/tools.py`: 학과 검색, 대학 조회, 진로 정보 조회 등의 툴 정의
 - `backend/graph/nodes.py`: `agent_node`, `should_continue`
 - `backend/graph/graph_builder.py`: `build_react_graph()`
 
-**장점:**
+### 2. Major Recommendation 패턴 (온보딩 추천)
 
-- LLM이 필요시에만 tool 호출 (효율적)
-- 여러 번 tool 호출 가능 (복잡한 질문 처리)
-- 진정한 Agentic 동작
-
-### 2. Structured 패턴 (고정 파이프라인)
-
-**미리 정해진 순서대로 실행되는 파이프라인 방식**
+**사용자의 온보딩 답변을 분석하여 전공을 추천하는 파이프라인**
 
 ```
-[사용자 질문] → retrieve_node → select_node → answer_node → [답변]
+[온보딩 답변] → recommend_majors_node → [추천 결과]
 ```
 
 **작동 순서:**
 
-1. `retrieve_node`: 벡터 DB에서 관련 과목 5개 검색
-2. `select_node`: LLM이 JSON 형식으로 적합한 과목 2-3개 선택
-3. `answer_node`: 선택된 과목만 사용하여 최종 답변 생성
+1. 사용자의 온보딩 답변(관심사, 과목, 희망 연봉 등) 수집
+2. `recommend_majors_node`: 답변을 텍스트 프로필로 변환 및 임베딩
+3. Vector Store(Pinecone)에서 관련 전공 검색
+4. 가중치를 적용하여 전공 점수 계산 및 상위 전공 추천
 
 **핵심 파일:**
 
-- `backend/graph/nodes.py`: `retrieve_node`, `select_node`, `answer_node`
-- `backend/graph/graph_builder.py`: `build_structured_graph()`
+- `backend/graph/nodes.py`: `recommend_majors_node`
+- `backend/graph/graph_builder.py`: `build_major_graph()`
 
-**장점:**
+### 실행 방법
 
-- Hallucination 방지 (선택된 과목만 LLM에게 제공)
-- 명확한 실행 순서 (디버깅 용이)
-- 예측 가능한 동작
-
-### 패턴 비교표
-
-| | **ReAct** | **Structured** |
-|---|---|---|
-| **Agentic** | ✅ 예 (LLM이 tool 호출 결정) | ❌ 아니오 (고정 순서) |
-| **실행 방식** | agent ⇄ tools (반복 가능) | retrieve → select → answer |
-| **tool 호출** | LLM이 자율 결정 | 무조건 실행 |
-| **유연성** | 높음 (복잡한 질문 처리) | 낮음 (단순 파이프라인) |
-| **Hallucination** | 가능성 있음 | 낮음 (선택된 과목만 제공) |
-| **현재 사용** | ✅ 기본값 | 옵션 |
-
-### 모드 변경 방법
-
-`backend/main.py`의 `run_mentor()` 함수에서 `mode` 파라미터로 변경:
+**대화형 멘토링 (ReAct):**
 
 ```python
-# ReAct 모드 (기본)
-answer = run_mentor("인공지능 과목 추천해줘")
+from backend.main import run_mentor
 
-# Structured 모드
-answer = run_mentor("인공지능 과목 추천해줘", mode="structured")
+answer = run_mentor("컴퓨터공학과가 있는 대학 알려줘")
 ```
 
-또는 `frontend/app.py`에서 직접 변경:
+**전공 추천 (Onboarding):**
 
 ```python
-response = run_mentor(
-    question=prompt,
-    interests=st.session_state.interests or None,
-    mode="structured"  # ← 여기를 변경
-)
+from backend.main import run_major_recommendation
+
+results = run_major_recommendation({
+    "interests": "코딩, 로봇",
+    "subjects": "수학, 과학"
+})
 ```
 
 ## 구성 설명
@@ -174,7 +151,7 @@ response = run_mentor(
 - **backend**
   - LangGraph + LangChain RAG 파이프라인 전체를 담당합니다.
   - `config.py`는 모든 경로 및 모델 설정을 중앙에서 관리하며, `.env` 기반으로 LLM/임베딩을 선택합니다.
-  - `rag/loader.py`는 JSON 데이터를 LangChain `Document`로 변환하고, `rag/vectorstore.py`는 Chroma 벡터스토어를 생성·로드합니다.
+  - `rag/loader.py`는 JSON 데이터를 LangChain `Document`로 변환하고, `rag/vectorstore.py`는 Vector 벡터스토어를 생성·로드합니다.
   - `rag/tools.py`는 `@tool` 데코레이터로 LLM이 호출할 수 있는 tool을 정의합니다.
   - `graph/` 폴더에는 RAG 파이프라인을 LangGraph로 정의한 노드, 상태, 그래프 빌더가 들어 있습니다.
 
@@ -182,8 +159,173 @@ response = run_mentor(
   - `frontend/app.py`는 Streamlit UI를 제공하며 `backend.main.run_mentor`를 직접 호출해 답변을 보여줍니다.
 
 - **데이터 소스**
-  - <https://www.career.go.kr/cnet/front/openapi/openApiMajorCenter.do>
   - API에서 받아온 과목 정보를 JSON으로 저장 후 `RAW_JSON` 경로에 둡니다.
+
+### 전공 카테고리 데이터 관리
+
+이 프로젝트는 `backend/rag/tools.py`에서 사용하는 전공 카테고리 정보(`MAIN_CATEGORIES`)를 `backend/data/major_detail.json`에서 동적으로 추출하여 사용합니다.
+
+1. **카테고리 추출 스크립트**: `backend/rag/extract_categories.py`
+   - `major_detail.json`을 분석하여 전공명과 관련 학과들을 매핑합니다.
+   - 실행 결과는 `backend/data/major_categories.json`에 저장됩니다.
+
+2. **데이터 갱신 방법**:
+   - `major_detail.json` 데이터가 변경되면 아래 명령어로 카테고리 정보를 갱신해야 합니다.
+
+   ```bash
+   python backend/rag/extract_categories.py
+   ```
+
+3. **동적 로딩**:
+   - `backend/rag/tools.py`는 실행 시 `major_categories.json`을 로드하여 최신 카테고리 정보를 반영합니다.
+
+## 데이터 아키텍처 및 메타데이터 구조
+
+이 프로젝트는 **2단계 데이터 저장 전략**을 사용하여 효율적인 검색과 상세 정보 조회를 동시에 지원합니다.
+
+### 메타데이터 구조
+
+전공 정보는 `MajorDoc` 클래스를 통해 Pinecone 벡터 데이터베이스에 저장되며, 다음과 같은 메타데이터를 포함합니다:
+
+```python
+@dataclass
+class MajorDoc:
+    doc_id: str                    # 문서 고유 ID (예: "컴퓨터공학:summary")
+    major_id: str                  # 전공 고유 ID
+    major_name: str                # 전공명
+    doc_type: str                  # 문서 타입 (summary, interest, property, subjects, jobs)
+    text: str                      # 임베딩할 텍스트 내용
+    cluster: Optional[str]         # 전공 클러스터 분류
+    salary: Optional[float]        # 평균 급여 정보
+    relate_subject_tags: list[str] # 관련 과목 태그 리스트
+    job_tags: list[str]            # 진출 직업 태그 리스트
+    raw_subjects: Optional[str]    # 원본 과목 정보
+    raw_jobs: Optional[str]        # 원본 직업 정보
+```
+
+### 문서 타입 (doc_type) 분류
+
+각 전공은 여러 개의 문서로 분해되어 저장됩니다:
+
+- **`summary`**: 전공 요약 설명
+- **`interest`**: 흥미/적성 정보 + 추천 활동
+- **`property`**: 전공 특성
+- **`subjects`**: 관련 과목 안내
+- **`jobs`**: 진출 직업 및 분야
+
+### 데이터 흐름 구조
+
+```
+major_detail.json (원본 데이터)
+        ↓
+load_major_detail() [backend/rag/loader.py]
+        ↓
+MajorRecord 객체 생성 (raw 필드에 전체 데이터 보관)
+        ↓
+┌───────────────────┬────────────────────┐
+│                   │                    │
+Pinecone 업로드      메모리 캐시           직접 조회
+(메타데이터만)       (_MAJOR_RECORDS_CACHE)  (tools.py)
+```
+
+### 2단계 데이터 저장 전략
+
+#### 1단계: Pinecone 벡터 데이터베이스 (검색용)
+
+**저장 데이터:**
+- 메타데이터: `doc_id`, `major_id`, `major_name`, `doc_type`, `cluster`, `salary`, `relate_subject_tags`, `job_tags`
+- 임베딩 벡터: `text` 필드를 임베딩한 벡터
+
+**용도:**
+- 의미 기반 유사도 검색
+- 빠른 전공 필터링 및 매칭
+
+**예시:**
+```python
+# "AI 관련 전공 찾기"와 같은 의미 기반 검색
+results = vectorstore.similarity_search("인공지능 관련 전공")
+```
+
+#### 2단계: 메모리 캐시 (상세 정보용)
+
+**저장 데이터:**
+- 전체 `MajorRecord` 객체 (모든 원본 데이터 포함)
+- `raw` 필드에 `major_detail.json`의 원본 JSON 데이터 전체 보관
+
+**용도:**
+- 상세 정보 조회 (대학 목록, 자격증, 주요 과목 등)
+- Pinecone에 저장되지 않은 추가 정보 제공
+
+**캐싱 메커니즘:**
+```python
+# backend/rag/tools.py
+_MAJOR_RECORDS_CACHE = None  # 전체 MajorRecord 리스트
+_MAJOR_ID_MAP = {}           # major_id로 빠른 조회
+_MAJOR_NAME_MAP = {}         # 전공명으로 빠른 조회
+_MAJOR_ALIAS_MAP = {}        # 별칭으로 빠른 조회
+
+def _ensure_major_records():
+    """첫 호출 시 major_detail.json을 로드하여 메모리에 캐싱"""
+    global _MAJOR_RECORDS_CACHE
+    if _MAJOR_RECORDS_CACHE is not None:
+        return
+    
+    records = load_major_detail()  # 전체 원본 데이터 로드
+    _MAJOR_RECORDS_CACHE = records
+    # 인덱스 생성...
+```
+
+### 실제 사용 흐름
+
+```python
+# 1단계: Pinecone으로 관련 전공 검색 (벡터 유사도)
+results = vectorstore.similarity_search("AI 관련 전공")
+
+# 2단계: 검색된 전공의 major_id로 상세 정보 조회
+record = _MAJOR_ID_MAP[major_id]
+
+# 3단계: 원본 데이터의 모든 필드 활용
+university_list = record.university      # Pinecone에 없는 정보
+chart_data = record.chart_data          # Pinecone에 없는 정보
+employment_rate = record.employment     # Pinecone에 없는 정보
+raw_json = record.raw                   # 전체 원본 JSON
+```
+
+### 메타데이터 활용 예시
+
+#### 필터링 및 정렬
+```python
+# 급여 정보를 기반으로 필터링
+high_salary_majors = [doc for doc in docs if doc.salary and doc.salary > 4000]
+
+# 클러스터별 그룹화
+engineering_majors = [doc for doc in docs if doc.cluster == "공학계열"]
+```
+
+#### 태그 기반 매칭
+```python
+# 사용자가 선택한 과목과 매칭
+user_subjects = ["수학", "물리"]
+matched = [doc for doc in docs 
+           if any(subj in doc.relate_subject_tags for subj in user_subjects)]
+```
+
+### 왜 이렇게 설계했을까?
+
+| 구분 | Pinecone (벡터 DB) | 메모리 캐시 (MajorRecord) |
+|------|-------------------|------------------------|
+| **용도** | 의미 기반 검색 | 상세 정보 조회 |
+| **저장 데이터** | 메타데이터 + 임베딩 | **전체 원본 데이터** |
+| **장점** | 빠른 유사도 검색 | 모든 필드 접근 가능 |
+| **예시** | "AI 관련 전공 찾기" | "컴퓨터공학과의 자격증 목록" |
+| **크기** | 가볍고 효율적 | 전체 데이터 보관 |
+
+### 관련 파일
+
+- **`backend/rag/loader.py`**: `MajorRecord`, `MajorDoc` 클래스 정의 및 데이터 로딩
+- **`backend/rag/tools.py`**: 메모리 캐시 관리 및 상세 정보 조회 툴
+- **`backend/rag/vectorstore.py`**: Pinecone 벡터 데이터베이스 관리
+- **`backend/data/major_detail.json`**: 원본 전공 데이터
 
 ## LLM/Embedding 모델 변경 방법
 
