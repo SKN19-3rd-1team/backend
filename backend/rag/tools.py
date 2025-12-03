@@ -29,6 +29,7 @@ from backend.config import get_settings
 
 from .vectorstore import get_major_vectorstore
 from .loader import load_major_detail
+from .university_lookup import lookup_university_url, search_universities
 
 # ==================== 상수 정의 ====================
 
@@ -176,19 +177,16 @@ def _load_major_categories() -> Dict[str, List[str]]:
         전공 카테고리 딕셔너리 (대분류 -> 세부분류 리스트)
     """
     try:
-        settings = get_settings()
-        # 절대 경로 시도
-        json_path = Path("/home/maroco/major_mentor/backend/data") / MAJOR_CATEGORIES_FILE
-        
-        # 절대 경로가 없으면 상대 경로 시도
-        if not json_path.exists():
-            base_dir = Path(__file__).parent.parent / "data"
-            json_path = base_dir / MAJOR_CATEGORIES_FILE
+        # 현재 파일(tools.py)의 위치: backend/rag/
+        # 데이터 파일 위치: backend/data/major_categories.json
+        current_dir = Path(__file__).resolve().parent
+        project_root = current_dir.parent  # backend/
+        json_path = project_root / "data" / MAJOR_CATEGORIES_FILE
         
         if json_path.exists():
             return json.loads(json_path.read_text(encoding="utf-8"))
         
-        print(f"⚠️ Major categories file not found: {json_path}")
+        print(f"⚠️ Major categories file not found at: {json_path}")
         return {}
         
     except Exception as e:
@@ -1218,3 +1216,98 @@ def get_search_help() -> str:
     
     _log_tool_result("get_search_help", "사용자 가이드 메시지 반환")
     return message
+
+
+@tool
+def get_university_admission_info(university_name: str, department_name: str = "") -> Dict[str, Any]:
+    """
+    특정 대학의 입시 정보(정시컷, 수시컷 등)를 조회하는 툴입니다.
+    
+    이 툴을 호출해야 하는 상황 (LLM용 가이드):
+    - 사용자가
+      - "서울대학교 컴퓨터공학과 정시컷 알려줘"
+      - "연세대학교 수시컷이 궁금해"
+      - "고려대학교 입시 결과 보여줘"
+      - "OO대학교 OO학과 입시 정보 알려줘"
+      와 같이 **특정 대학의 입시 정보**를 요청할 때 사용하세요.
+    
+    파라미터 설명:
+    - university_name:
+        입시 정보를 조회할 대학명.
+        예: "서울대학교", "연세대학교", "고려대학교"
+    - department_name:
+        (선택) 학과명. 제공되면 응답 메시지에 포함됩니다.
+        예: "컴퓨터공학과", "경영학과"
+    """
+    query = (university_name or "").strip()
+    dept = (department_name or "").strip()
+    
+    _log_tool_start(
+        "get_university_admission_info", 
+        f"대학 입시 정보 조회 - university='{query}', department='{dept}'"
+    )
+    print(f"✅ Using get_university_admission_info tool for: '{query}' / '{dept}'")
+    
+    # 입력 검증
+    if not query:
+        result = {
+            "error": "invalid_query",
+            "message": "대학명을 입력해 주세요.",
+            "suggestion": "예: '서울대학교', '연세대학교', '고려대학교'"
+        }
+        _log_tool_result("get_university_admission_info", "대학명 누락 - 오류 반환")
+        return result
+    
+    # 대학 정보 조회
+    university_info = lookup_university_url(query)
+    
+    if university_info is None:
+        print(f"⚠️  WARNING: No admission data found for '{query}'")
+        
+        # 유사한 대학명 검색
+        similar_universities = search_universities(query)
+        
+        if similar_universities:
+            similar_names = [u["university"] for u in similar_universities[:5]]
+            result = {
+                "error": "no_exact_match",
+                "message": f"'{query}' 대학의 입시 정보를 찾을 수 없습니다.",
+                "suggestion": f"다음 대학명 중 하나를 선택해주세요: {', '.join(similar_names)}",
+                "similar_universities": similar_names
+            }
+        else:
+            result = {
+                "error": "no_results",
+                "message": f"'{query}' 대학의 입시 정보를 찾을 수 없습니다.",
+                "suggestion": "대학명을 정확히 입력해주세요. 예: '서울대학교', '연세대학교[본교]'"
+            }
+        
+        _log_tool_result("get_university_admission_info", "대학 데이터 미발견 - 오류 반환")
+        return result
+    
+    # 성공 응답 구성
+    response: Dict[str, Any] = {
+        "university": university_info["university"],
+        "code": university_info["code"],
+        "url": university_info["url"],
+        "source": "KCUE (한국대학교육협의회)",
+        "message": f"{university_info['university']}의 입시 정보를 찾았습니다."
+    }
+    
+    # 학과명이 제공된 경우 메시지에 포함
+    if dept:
+        response["department"] = dept
+        response["message"] = f"{university_info['university']} {dept}의 입시 정보를 찾았습니다."
+    
+    # 안내 메시지 추가
+    response["guide"] = "입시제도에 대해서는 해당 URL 좌측 메뉴의 평가기준 및 입시결과를 참고해주세요!"
+    
+    print(f"✅ Found admission info for '{university_info['university']}'")
+    print(f"   URL: {university_info['url']}")
+    
+    _log_tool_result(
+        "get_university_admission_info",
+        f"{university_info['university']} 입시 정보 URL 반환"
+    )
+    
+    return response
