@@ -18,16 +18,12 @@ class MentorState(TypedDict):
 
     두 가지 패턴을 모두 지원하기 위해 필드가 나뉘어 있습니다:
     - ReAct 패턴: messages 필드 사용
-    - Structured 패턴: question, retrieved_docs, answer 등 사용
     """
 
     # ==================== ReAct 패턴용 필드 ====================
     # add_messages: 메시지를 리스트에 추가하는 reducer 함수
     # agent_node와 tools 노드 간에 메시지를 주고받을 때 사용
     messages: Annotated[List[BaseMessage], add_messages]
-
-    # ==================== Structured 패턴용 필드 ====================
-    # NotRequired: 이 필드는 선택적이며, 모든 노드에서 항상 존재하지 않을 수 있음
 
     question: NotRequired[Optional[str]]  # 학생의 질문 (retrieve_node에서 사용)
     interests: Optional[str]  # 학생의 관심사/진로 방향 (현재 미사용, 향후 확장 가능)
@@ -40,3 +36,11 @@ class MentorState(TypedDict):
     # 메타데이터 필터 적용 정보 (디버깅/로깅용)
     metadata_filter_applied: NotRequired[bool]  # 필터가 적용되었는지 여부
     metadata_filter_relaxed: NotRequired[bool]  # 필터가 완화되었는지 여부 (결과 없을 때)
+
+    # Major recommendation pipeline
+    onboarding_answers: NotRequired[Dict[str, Any]]  # 온보딩 단계에서 수집된 학생 선호
+    user_profile_text: NotRequired[Optional[str]]  # 온보딩 정보를 요약한 텍스트
+    user_profile_embedding: NotRequired[Optional[List[float]]]  # 임베딩된 학생 프로필
+    major_search_hits: NotRequired[List[Dict[str, Any]]]  # Pinecone 검색 결과 요약
+    major_scores: NotRequired[Dict[str, float]]  # 전공별 점수 집계
+    recommended_majors: NotRequired[List[Dict[str, Any]]]  # 최종 추천 전공 리스트

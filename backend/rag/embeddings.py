@@ -5,7 +5,7 @@
 .env 파일의 EMBEDDING_PROVIDER 설정에 따라 OpenAI 또는 HuggingFace 임베딩을 사용합니다.
 
 임베딩 모델은 다음 용도로 사용됩니다:
-1. 과목 정보를 벡터로 변환하여 Chroma DB에 저장 (vectorstore.py)
+1. 과목 정보를 벡터로 변환하여 Vector DB에 저장 (vectorstore.py)
 2. 사용자 질문을 벡터로 변환하여 유사한 과목 검색 (retriever.py)
 """
 # backend/rag/embeddings.py

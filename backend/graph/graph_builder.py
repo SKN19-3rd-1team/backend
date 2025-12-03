@@ -4,7 +4,7 @@ LangGraph 그래프를 빌드하는 팩토리 함수들을 정의합니다.
 
 이 파일은 두 가지 다른 그래프 구조를 생성합니다:
 1. **ReAct 그래프**: LLM이 자율적으로 tool을 호출하는 에이전트 패턴
-2. **Structured 그래프**: 고정된 순서로 실행되는 파이프라인 패턴
+2. **Major 그래프**: 온보딩 기반 전공 추천 전용
 """
 
 from langgraph.graph import StateGraph
@@ -12,8 +12,8 @@ from langgraph.constants import END
 from langgraph.prebuilt import ToolNode
 from .state import MentorState
 from .nodes import (
-    retrieve_node, select_node, answer_node,
-    agent_node, should_continue, tools
+    agent_node, should_continue, tools,
+    recommend_majors_node,
 )
 
 def build_graph(mode: str = "react"):
@@ -23,7 +23,7 @@ def build_graph(mode: str = "react"):
     Args:
         mode: 그래프 실행 모드
             - "react": ReAct 에이전트 방식 (LLM이 tool 호출 여부 자율 결정)
-            - "structured": Structured Output 방식 (고정된 파이프라인)
+            - "major": 온보딩 기반 전공 추천 전용
 
     Returns:
         Compiled LangGraph application
@@ -33,10 +33,10 @@ def build_graph(mode: str = "react"):
     """
     if mode == "react":
         return build_react_graph()
-    elif mode == "structured":
-        return build_structured_graph()
+    elif mode == "major":  # 온보딩 기반 전공 추천 파이프라인 전용
+        return build_major_graph()
     else:
-        raise ValueError(f"Unknown mode: {mode}. Use 'react' or 'structured'.")
+        raise ValueError(f"Unknown mode: {mode}. Use 'react' or 'major'.")
 
 
 def build_react_graph():
@@ -94,43 +94,12 @@ def build_react_graph():
     return app
 
 
-def build_structured_graph():
+def build_major_graph():
     """
-    Structured Output 기반 RAG 그래프를 빌드합니다.
-
-    ** 그래프 구조 **
-    ```
-    [시작] → retrieve → select → answer → [종료]
-    ```
-
-    ** 실행 플로우 **
-    1. retrieve_node: 벡터 DB에서 과목 후보 검색 (5개)
-    2. select_node: LLM이 JSON으로 적합한 과목 ID만 선택 (2-3개)
-    3. answer_node: 선택된 과목만 사용하여 최종 답변 생성
-
-    ** 특징 **
-    - 고정된 순서로 무조건 실행 (retrieve → select → answer)
-    - LLM이 노드 실행 여부를 결정하지 않음 (Agentic하지 않음)
-    - 파이프라인 방식
-    - Hallucination 방지에 유리 (선택된 과목만 제공)
-
-    ** ReAct와의 차이 **
-    - ReAct: LLM이 tool 호출 여부 자율 결정
-    - Structured: 무조건 retrieve → select → answer 순서대로 실행
+    Graph dedicated to onboarding-based major recommendations.
     """
     graph = StateGraph(MentorState)
-
-    # 노드 추가 (순차 실행)
-    graph.add_node("retrieve", retrieve_node)  # 1단계: 검색
-    graph.add_node("select", select_node)      # 2단계: 선택
-    graph.add_node("answer", answer_node)      # 3단계: 답변 생성
-
-    # 엣지 설정 (고정된 순서)
-    graph.set_entry_point("retrieve")      # 시작점
-    graph.add_edge("retrieve", "select")   # retrieve → select
-    graph.add_edge("select", "answer")     # select → answer
-    graph.add_edge("answer", END)          # answer → 종료
-
-    # 그래프 컴파일
-    app = graph.compile()
-    return app
+    graph.add_node("recommend", recommend_majors_node)
+    graph.set_entry_point("recommend")
+    graph.add_edge("recommend", END)
+    return graph.compile()
