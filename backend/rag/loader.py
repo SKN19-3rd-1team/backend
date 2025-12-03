@@ -37,6 +37,10 @@ class MajorRecord:
     enter_field: Any
     salary: Optional[float]
     employment: Optional[str] = None
+    gender: Any = None
+    satisfaction: Any = None
+    employment_rate: Any = None
+    acceptance_rate: Optional[float] = None
     department_aliases: list[str] = field(default_factory=list)
     career_act: Any = None
     qualifications: Any = None
@@ -96,6 +100,48 @@ def _parse_salary(raw_salary: Any) -> Optional[float]:
     return None
 
 
+def _calculate_acceptance_rate(chart_data: Any) -> Optional[float]:
+    """
+    chartData의 applicant 정보를 기반으로 합격률(입학자/지원자 * 100)을 계산한다.
+    구조: [{"item": "지원자", "data": "21525"}, {"item": "입학자", "data": "3448"}]
+    """
+    if not chart_data or not isinstance(chart_data, list) or not chart_data:
+        return None
+    
+    # chartData는 리스트이고 첫 번째 요소에 모든 데이터가 있음
+    stats = chart_data[0]
+    if not isinstance(stats, dict):
+        return None
+        
+    applicants_list = stats.get("applicant")
+    if not applicants_list or not isinstance(applicants_list, list):
+        return None
+
+    applicant_count = 0.0
+    entrant_count = 0.0
+
+    for item in applicants_list:
+        if not isinstance(item, dict):
+            continue
+        label = item.get("item")
+        data_str = item.get("data", "0")
+        
+        try:
+            val = float(data_str)
+            if label == "지원자":
+                applicant_count = val
+            elif label == "입학자":
+                entrant_count = val
+        except (ValueError, TypeError):
+            continue
+
+    if applicant_count > 0:
+        rate = (entrant_count / applicant_count) * 100
+        return round(rate, 1)
+        
+    return None
+
+
 def _split_multi_value(value: str) -> list[str]:
     # 콤마/슬래시 등으로 구분된 학과명 문자열을 리스트로 변환
     if not value:
@@ -138,6 +184,22 @@ def load_major_detail(path: str | Path | None = None) -> list[MajorRecord]:
 
             salary = _parse_salary(payload.get("salary"))
             department_aliases = _split_multi_value(payload.get("department", ""))
+            
+            # chartData 처리
+            chart_data = payload.get("chartData")
+            acceptance_rate = _calculate_acceptance_rate(chart_data)
+            
+            # 통계 데이터 추출 (chartData[0] 내부에 존재)
+            gender_stats = None
+            satisfaction_stats = None
+            employment_rate_stats = None
+            
+            if chart_data and isinstance(chart_data, list) and len(chart_data) > 0:
+                stats_block = chart_data[0]
+                if isinstance(stats_block, dict):
+                    gender_stats = stats_block.get("gender")
+                    satisfaction_stats = stats_block.get("satisfaction")
+                    employment_rate_stats = stats_block.get("employment_rate")
 
             record = MajorRecord(
                 major_id=major_id,
@@ -151,12 +213,16 @@ def load_major_detail(path: str | Path | None = None) -> list[MajorRecord]:
                 enter_field=payload.get("enter_field"),
                 salary=salary,
                 employment=payload.get("employment"),
+                gender=gender_stats,
+                satisfaction=satisfaction_stats,
+                employment_rate=employment_rate_stats,
+                acceptance_rate=acceptance_rate,
                 department_aliases=department_aliases,
                 career_act=payload.get("career_act"),
                 qualifications=payload.get("qualifications"),
                 main_subject=payload.get("main_subject"),
                 university=payload.get("university"),
-                chart_data=payload.get("chartData"),
+                chart_data=chart_data,
                 raw=payload,
             )
             records.append(record)

@@ -17,6 +17,7 @@ streamlit run frontend/app.py
 """
 # frontend/app.py
 import streamlit as st
+import time
 from pathlib import Path
 import sys
 
@@ -112,6 +113,19 @@ if "force_recalc_major" not in st.session_state:
     st.session_state.force_recalc_major = False
 
 
+def response_generator(text: str):
+    """텍스트를 단어 단위로 스트리밍하는 제너레이터"""
+    # None이나 비어있는 경우 처리
+    if not text:
+        return
+        
+    # 딕셔너리 등 문자열이 아닌 경우 문자열로 변환
+    if not isinstance(text, str):
+        text = str(text)
+
+    for word in text.split(" "):
+        yield word + " "
+        time.sleep(0.02)
 
 
 def ensure_onboarding_flow():
@@ -282,7 +296,7 @@ def sync_major_summary_message():
 
 
 st.title("🎓 전공 탐색 멘토 챗봇")
-st.write("이공계열 과목들을 기반으로, 나에게 맞는 과목과 진로를 함께 고민해보는 멘토 챗봇입니다.")
+st.write("선호 과목들을 기반으로, 나에게 맞는 과목과 진로를 함께 고민해보는 멘토 챗봇입니다.")
 
 # 온보딩 설문이 끝나지 않았다면 즉시 진행
 ensure_onboarding_flow()
@@ -407,7 +421,8 @@ if prompt:
         
         # 일반 텍스트 응답 처리
         response_content = raw_response
-        st.markdown(response_content) # 일반 텍스트는 즉시 출력
+        # 스트리밍 출력 적용
+        st.write_stream(response_generator(response_content))
 
     # Add assistant response to chat history
     st.session_state.messages.append({"role": "assistant", "content": response_content})
