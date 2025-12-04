@@ -1,0 +1,874 @@
+{
+  "가야대학교[본교]": {
+    "code": "0002748",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0002748&searchSyr=2026"
+  },
+  "가천대학교[본교]": {
+    "code": "0000063",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000063&searchSyr=2026"
+  },
+  "가톨릭관동대학교[본교]": {
+    "code": "0000072",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000072&searchSyr=2026"
+  },
+  "가톨릭꽃동네대학교[본교]": {
+    "code": "0000215",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000215&searchSyr=2026"
+  },
+  "가톨릭대학교[본교]": {
+    "code": "0000046",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000046&searchSyr=2026"
+  },
+  "가톨릭대학교[제2캠퍼스]": {
+    "code": "0000048",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000048&searchSyr=2026"
+  },
+  "가톨릭대학교[제3캠퍼스]": {
+    "code": "0000049",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000049&searchSyr=2026"
+  },
+  "감리교신학대학교[본교]": {
+    "code": "0000050",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000050&searchSyr=2026"
+  },
+  "강남대학교[본교]": {
+    "code": "0000051",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000051&searchSyr=2026"
+  },
+  "강서대학교[본교]": {
+    "code": "0000079",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000079&searchSyr=2026"
+  },
+  "강원대학교[본교]": {
+    "code": "0000003",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000003&searchSyr=2026"
+  },
+  "강원대학교[제2캠퍼스]": {
+    "code": "0000004",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000004&searchSyr=2026"
+  },
+  "건국대학교(글로컬)[분교]": {
+    "code": "0000053",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000053&searchSyr=2026"
+  },
+  "건국대학교[본교]": {
+    "code": "0000052",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000052&searchSyr=2026"
+  },
+  "건양대학교[본교]": {
+    "code": "0000054",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000054&searchSyr=2026"
+  },
+  "건양대학교[제2캠퍼스]": {
+    "code": "0000055",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000055&searchSyr=2026"
+  },
+  "경기대학교[본교]": {
+    "code": "0000056",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000056&searchSyr=2026"
+  },
+  "경기대학교[제2캠퍼스]": {
+    "code": "0000058",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000058&searchSyr=2026"
+  },
+  "경남대학교[본교]": {
+    "code": "0000059",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000059&searchSyr=2026"
+  },
+  "경동대학교[본교]": {
+    "code": "0000060",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000060&searchSyr=2026"
+  },
+  "경동대학교[제3캠퍼스]": {
+    "code": "0002574",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0002574&searchSyr=2026"
+  },
+  "경동대학교[제4캠퍼스]": {
+    "code": "0002744",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0002744&searchSyr=2026"
+  },
+  "경북대학교[본교]": {
+    "code": "0000005",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000005&searchSyr=2026"
+  },
+  "경상국립대학교[본교]": {
+    "code": "0000007",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000007&searchSyr=2026"
+  },
+  "경성대학교[본교]": {
+    "code": "0000062",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000062&searchSyr=2026"
+  },
+  "경운대학교[본교]": {
+    "code": "0000244",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000244&searchSyr=2026"
+  },
+  "경인교육대학교[본교]": {
+    "code": "0000256",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000256&searchSyr=2026"
+  },
+  "경일대학교[본교]": {
+    "code": "0000064",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000064&searchSyr=2026"
+  },
+  "경희대학교[본교]": {
+    "code": "0000066",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000066&searchSyr=2026"
+  },
+  "계명대학교[본교]": {
+    "code": "0000068",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000068&searchSyr=2026"
+  },
+  "고려대학교(세종)[분교]": {
+    "code": "0000070",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000070&searchSyr=2026"
+  },
+  "고려대학교[본교]": {
+    "code": "0000069",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000069&searchSyr=2026"
+  },
+  "고신대학교[본교]": {
+    "code": "0000071",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000071&searchSyr=2026"
+  },
+  "공주교육대학교[본교]": {
+    "code": "0000251",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000251&searchSyr=2026"
+  },
+  "광신대학교[본교]": {
+    "code": "0000073",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000073&searchSyr=2026"
+  },
+  "광운대학교[본교]": {
+    "code": "0000074",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000074&searchSyr=2026"
+  },
+  "광주가톨릭대학교[본교]": {
+    "code": "0000075",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000075&searchSyr=2026"
+  },
+  "광주교육대학교[본교]": {
+    "code": "0000252",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000252&searchSyr=2026"
+  },
+  "광주대학교[본교]": {
+    "code": "0000231",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000231&searchSyr=2026"
+  },
+  "광주여자대학교[본교]": {
+    "code": "0000076",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000076&searchSyr=2026"
+  },
+  "국립강릉원주대학교[본교]": {
+    "code": "0000001",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000001&searchSyr=2026"
+  },
+  "국립강릉원주대학교[제2캠퍼스]": {
+    "code": "0000002",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000002&searchSyr=2026"
+  },
+  "국립경국대학교[본교]": {
+    "code": "0000021",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000021&searchSyr=2026"
+  },
+  "국립공주대학교[본교]": {
+    "code": "0000008",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000008&searchSyr=2026"
+  },
+  "국립군산대학교[본교]": {
+    "code": "0000009",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000009&searchSyr=2026"
+  },
+  "국립금오공과대학교[본교]": {
+    "code": "0000010",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000010&searchSyr=2026"
+  },
+  "국립목포대학교[본교]": {
+    "code": "0000011",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000011&searchSyr=2026"
+  },
+  "국립목포해양대학교[본교]": {
+    "code": "0000012",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000012&searchSyr=2026"
+  },
+  "국립부경대학교[본교]": {
+    "code": "0000013",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000013&searchSyr=2026"
+  },
+  "국립순천대학교[본교]": {
+    "code": "0000020",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000020&searchSyr=2026"
+  },
+  "국립창원대학교[본교]": {
+    "code": "0000028",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000028&searchSyr=2026"
+  },
+  "국립창원대학교[제2캠퍼스]": {
+    "code": "0003297",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0003297&searchSyr=2026"
+  },
+  "국립창원대학교[제3캠퍼스]": {
+    "code": "0003298",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0003298&searchSyr=2026"
+  },
+  "국립한국교통대학교[본교]": {
+    "code": "0000034",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000034&searchSyr=2026"
+  },
+  "국립한국해양대학교[본교]": {
+    "code": "0000033",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000033&searchSyr=2026"
+  },
+  "국립한밭대학교[본교]": {
+    "code": "0000039",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000039&searchSyr=2026"
+  },
+  "국민대학교[본교]": {
+    "code": "0000078",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000078&searchSyr=2026"
+  },
+  "극동대학교[본교]": {
+    "code": "0000080",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000080&searchSyr=2026"
+  },
+  "금강대학교[본교]": {
+    "code": "0000224",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000224&searchSyr=2026"
+  },
+  "김천대학교[본교]": {
+    "code": "0000241",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000241&searchSyr=2026"
+  },
+  "나사렛대학교[본교]": {
+    "code": "0000081",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000081&searchSyr=2026"
+  },
+  "남부대학교[본교]": {
+    "code": "0000216",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000216&searchSyr=2026"
+  },
+  "남서울대학교[본교]": {
+    "code": "0000245",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000245&searchSyr=2026"
+  },
+  "단국대학교[본교]": {
+    "code": "0000082",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000082&searchSyr=2026"
+  },
+  "단국대학교[제2캠퍼스]": {
+    "code": "0002726",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0002726&searchSyr=2026"
+  },
+  "대구가톨릭대학교[본교]": {
+    "code": "0000088",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000088&searchSyr=2026"
+  },
+  "대구교육대학교[본교]": {
+    "code": "0000253",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000253&searchSyr=2026"
+  },
+  "대구대학교[본교]": {
+    "code": "0000084",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000084&searchSyr=2026"
+  },
+  "대구예술대학교[본교]": {
+    "code": "0000087",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000087&searchSyr=2026"
+  },
+  "대구한의대학교[본교]": {
+    "code": "0000061",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000061&searchSyr=2026"
+  },
+  "대신대학교[본교]": {
+    "code": "0000093",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000093&searchSyr=2026"
+  },
+  "대전가톨릭대학교[본교]": {
+    "code": "0000094",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000094&searchSyr=2026"
+  },
+  "대전대학교[본교]": {
+    "code": "0000095",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000095&searchSyr=2026"
+  },
+  "대전신학대학교[본교]": {
+    "code": "0000238",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000238&searchSyr=2026"
+  },
+  "대진대학교[본교]": {
+    "code": "0000097",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000097&searchSyr=2026"
+  },
+  "덕성여자대학교[본교]": {
+    "code": "0000099",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000099&searchSyr=2026"
+  },
+  "동국대학교(WISE)[분교]": {
+    "code": "0000101",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000101&searchSyr=2026"
+  },
+  "동국대학교[본교]": {
+    "code": "0000100",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000100&searchSyr=2026"
+  },
+  "동덕여자대학교[본교]": {
+    "code": "0000102",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000102&searchSyr=2026"
+  },
+  "동명대학교[본교]": {
+    "code": "0000235",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000235&searchSyr=2026"
+  },
+  "동서대학교[본교]": {
+    "code": "0000103",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000103&searchSyr=2026"
+  },
+  "동신대학교[본교]": {
+    "code": "0000104",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000104&searchSyr=2026"
+  },
+  "동아대학교[본교]": {
+    "code": "0000105",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000105&searchSyr=2026"
+  },
+  "동양대학교[본교]": {
+    "code": "0000106",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000106&searchSyr=2026"
+  },
+  "동의대학교[본교]": {
+    "code": "0000107",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000107&searchSyr=2026"
+  },
+  "루터대학교[본교]": {
+    "code": "0000108",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000108&searchSyr=2026"
+  },
+  "명지대학교[본교]": {
+    "code": "0000109",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000109&searchSyr=2026"
+  },
+  "명지대학교[제2캠퍼스]": {
+    "code": "0000111",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000111&searchSyr=2026"
+  },
+  "목원대학교[본교]": {
+    "code": "0000112",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000112&searchSyr=2026"
+  },
+  "목포가톨릭대학교[본교]": {
+    "code": "0000221",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000221&searchSyr=2026"
+  },
+  "배재대학교[본교]": {
+    "code": "0000113",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000113&searchSyr=2026"
+  },
+  "백석대학교[본교]": {
+    "code": "0000178",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000178&searchSyr=2026"
+  },
+  "부산가톨릭대학교[본교]": {
+    "code": "0000114",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000114&searchSyr=2026"
+  },
+  "부산교육대학교[본교]": {
+    "code": "0000254",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000254&searchSyr=2026"
+  },
+  "부산대학교[본교]": {
+    "code": "0000014",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000014&searchSyr=2026"
+  },
+  "부산외국어대학교[본교]": {
+    "code": "0000115",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000115&searchSyr=2026"
+  },
+  "부산장신대학교[본교]": {
+    "code": "0000222",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000222&searchSyr=2026"
+  },
+  "삼육대학교[본교]": {
+    "code": "0000116",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000116&searchSyr=2026"
+  },
+  "상명대학교[본교]": {
+    "code": "0000117",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000117&searchSyr=2026"
+  },
+  "상명대학교[제2캠퍼스]": {
+    "code": "0002959",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0002959&searchSyr=2026"
+  },
+  "상지대학교[본교]": {
+    "code": "0000119",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000119&searchSyr=2026"
+  },
+  "서강대학교[본교]": {
+    "code": "0000120",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000120&searchSyr=2026"
+  },
+  "서경대학교[본교]": {
+    "code": "0000121",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000121&searchSyr=2026"
+  },
+  "서울과학기술대학교[본교]": {
+    "code": "0000036",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000036&searchSyr=2026"
+  },
+  "서울교육대학교[본교]": {
+    "code": "0000255",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000255&searchSyr=2026"
+  },
+  "서울기독대학교[본교]": {
+    "code": "0000098",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000098&searchSyr=2026"
+  },
+  "서울대학교[본교]": {
+    "code": "0000019",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000019&searchSyr=2026"
+  },
+  "서울시립대학교[본교]": {
+    "code": "0000040",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000040&searchSyr=2026"
+  },
+  "서울신학대학교[본교]": {
+    "code": "0000125",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000125&searchSyr=2026"
+  },
+  "서울여자대학교[본교]": {
+    "code": "0000126",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000126&searchSyr=2026"
+  },
+  "서울장신대학교[본교]": {
+    "code": "0000127",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000127&searchSyr=2026"
+  },
+  "서울한영대학교[본교]": {
+    "code": "0000205",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000205&searchSyr=2026"
+  },
+  "서원대학교[본교]": {
+    "code": "0000128",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000128&searchSyr=2026"
+  },
+  "선문대학교[본교]": {
+    "code": "0000129",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000129&searchSyr=2026"
+  },
+  "성결대학교[본교]": {
+    "code": "0000131",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000131&searchSyr=2026"
+  },
+  "성공회대학교[본교]": {
+    "code": "0000132",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000132&searchSyr=2026"
+  },
+  "성균관대학교[본교]": {
+    "code": "0000133",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000133&searchSyr=2026"
+  },
+  "성신여자대학교[본교]": {
+    "code": "0000136",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000136&searchSyr=2026"
+  },
+  "세명대학교[본교]": {
+    "code": "0000137",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000137&searchSyr=2026"
+  },
+  "세종대학교[본교]": {
+    "code": "0000138",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000138&searchSyr=2026"
+  },
+  "세한대학교[본교]": {
+    "code": "0000092",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000092&searchSyr=2026"
+  },
+  "송원대학교[본교]": {
+    "code": "0000243",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000243&searchSyr=2026"
+  },
+  "수원가톨릭대학교[본교]": {
+    "code": "0000139",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000139&searchSyr=2026"
+  },
+  "수원대학교[본교]": {
+    "code": "0000140",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000140&searchSyr=2026"
+  },
+  "숙명여자대학교[본교]": {
+    "code": "0000141",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000141&searchSyr=2026"
+  },
+  "순천향대학교[본교]": {
+    "code": "0000142",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000142&searchSyr=2026"
+  },
+  "숭실대학교[본교]": {
+    "code": "0000143",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000143&searchSyr=2026"
+  },
+  "신경주대학교[본교]": {
+    "code": "0000065",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000065&searchSyr=2026"
+  },
+  "신라대학교[본교]": {
+    "code": "0000144",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000144&searchSyr=2026"
+  },
+  "신한대학교[본교]": {
+    "code": "0002712",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0002712&searchSyr=2026"
+  },
+  "신한대학교[제2캠퍼스]": {
+    "code": "0002800",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0002800&searchSyr=2026"
+  },
+  "아신대학교[본교]": {
+    "code": "0000145",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000145&searchSyr=2026"
+  },
+  "아주대학교[본교]": {
+    "code": "0000146",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000146&searchSyr=2026"
+  },
+  "안양대학교[본교]": {
+    "code": "0000147",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000147&searchSyr=2026"
+  },
+  "안양대학교[제2캠퍼스]": {
+    "code": "0000148",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000148&searchSyr=2026"
+  },
+  "연세대학교(미래)[분교]": {
+    "code": "0000150",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000150&searchSyr=2026"
+  },
+  "연세대학교[본교]": {
+    "code": "0000149",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000149&searchSyr=2026"
+  },
+  "영남대학교[본교]": {
+    "code": "0000151",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000151&searchSyr=2026"
+  },
+  "영남신학대학교[본교]": {
+    "code": "0000153",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000153&searchSyr=2026"
+  },
+  "영산대학교[본교]": {
+    "code": "0003193",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0003193&searchSyr=2026"
+  },
+  "영산대학교[제2캠퍼스]": {
+    "code": "0003194",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0003194&searchSyr=2026"
+  },
+  "영산선학대학교[본교]": {
+    "code": "0000155",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000155&searchSyr=2026"
+  },
+  "예수대학교[본교]": {
+    "code": "0000228",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000228&searchSyr=2026"
+  },
+  "예원예술대학교[본교]": {
+    "code": "0000218",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000218&searchSyr=2026"
+  },
+  "예원예술대학교[제2캠퍼스]": {
+    "code": "0000219",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000219&searchSyr=2026"
+  },
+  "용인대학교[본교]": {
+    "code": "0000156",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000156&searchSyr=2026"
+  },
+  "우석대학교[본교]": {
+    "code": "0000157",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000157&searchSyr=2026"
+  },
+  "우송대학교[본교]": {
+    "code": "0000240",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000240&searchSyr=2026"
+  },
+  "울산대학교[본교]": {
+    "code": "0000158",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000158&searchSyr=2026"
+  },
+  "원광대학교[본교]": {
+    "code": "0000159",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000159&searchSyr=2026"
+  },
+  "위덕대학교[본교]": {
+    "code": "0000160",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000160&searchSyr=2026"
+  },
+  "유원대학교[본교]": {
+    "code": "0000154",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000154&searchSyr=2026"
+  },
+  "을지대학교[본교]": {
+    "code": "0000161",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000161&searchSyr=2026"
+  },
+  "을지대학교[제2캠퍼스]": {
+    "code": "0000162",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000162&searchSyr=2026"
+  },
+  "을지대학교[제3캠퍼스]": {
+    "code": "0002911",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0002911&searchSyr=2026"
+  },
+  "이화여자대학교[본교]": {
+    "code": "0000163",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000163&searchSyr=2026"
+  },
+  "인제대학교[본교]": {
+    "code": "0000164",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000164&searchSyr=2026"
+  },
+  "인천가톨릭대학교[본교]": {
+    "code": "0000168",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000168&searchSyr=2026"
+  },
+  "인천가톨릭대학교[제2캠퍼스]": {
+    "code": "0000167",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000167&searchSyr=2026"
+  },
+  "인천대학교[본교]": {
+    "code": "0002660",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0002660&searchSyr=2026"
+  },
+  "인하대학교[본교]": {
+    "code": "0000169",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000169&searchSyr=2026"
+  },
+  "장로회신학대학교[본교]": {
+    "code": "0000170",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000170&searchSyr=2026"
+  },
+  "전남대학교[본교]": {
+    "code": "0000023",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000023&searchSyr=2026"
+  },
+  "전남대학교[제2캠퍼스]": {
+    "code": "0000024",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000024&searchSyr=2026"
+  },
+  "전북대학교[본교]": {
+    "code": "0000025",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000025&searchSyr=2026"
+  },
+  "전주교육대학교[본교]": {
+    "code": "0000258",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000258&searchSyr=2026"
+  },
+  "전주대학교[본교]": {
+    "code": "0000171",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000171&searchSyr=2026"
+  },
+  "제주국제대학교[본교]": {
+    "code": "0000248",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000248&searchSyr=2026"
+  },
+  "제주대학교[본교]": {
+    "code": "0000027",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000027&searchSyr=2026"
+  },
+  "조선대학교[본교]": {
+    "code": "0000172",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000172&searchSyr=2026"
+  },
+  "중부대학교[본교]": {
+    "code": "0000173",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000173&searchSyr=2026"
+  },
+  "중앙대학교[본교]": {
+    "code": "0000175",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000175&searchSyr=2026"
+  },
+  "중앙대학교[제2캠퍼스]": {
+    "code": "0000174",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000174&searchSyr=2026"
+  },
+  "중앙승가대학교[본교]": {
+    "code": "0000177",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000177&searchSyr=2026"
+  },
+  "중원대학교[본교]": {
+    "code": "0000239",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000239&searchSyr=2026"
+  },
+  "진주교육대학교[본교]": {
+    "code": "0000260",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000260&searchSyr=2026"
+  },
+  "차의과학대학교[본교]": {
+    "code": "0000187",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000187&searchSyr=2026"
+  },
+  "창신대학교[본교]": {
+    "code": "0000249",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000249&searchSyr=2026"
+  },
+  "청운대학교[본교]": {
+    "code": "0000284",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000284&searchSyr=2026"
+  },
+  "청주교육대학교[본교]": {
+    "code": "0000261",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000261&searchSyr=2026"
+  },
+  "청주대학교[본교]": {
+    "code": "0000179",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000179&searchSyr=2026"
+  },
+  "초당대학교[본교]": {
+    "code": "0000246",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000246&searchSyr=2026"
+  },
+  "총신대학교[본교]": {
+    "code": "0000180",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000180&searchSyr=2026"
+  },
+  "추계예술대학교[본교]": {
+    "code": "0000181",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000181&searchSyr=2026"
+  },
+  "춘천교육대학교[본교]": {
+    "code": "0000262",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000262&searchSyr=2026"
+  },
+  "충남대학교[본교]": {
+    "code": "0000029",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000029&searchSyr=2026"
+  },
+  "충북대학교[본교]": {
+    "code": "0000030",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000030&searchSyr=2026"
+  },
+  "칼빈대학교[본교]": {
+    "code": "0000184",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000184&searchSyr=2026"
+  },
+  "평택대학교[본교]": {
+    "code": "0000186",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000186&searchSyr=2026"
+  },
+  "포항공과대학교[본교]": {
+    "code": "0000188",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000188&searchSyr=2026"
+  },
+  "한경국립대학교[본교]": {
+    "code": "0000037",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000037&searchSyr=2026"
+  },
+  "한국공학대학교[본교]": {
+    "code": "0000247",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000247&searchSyr=2026"
+  },
+  "한국교원대학교[본교]": {
+    "code": "0000031",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000031&searchSyr=2026"
+  },
+  "한국기술교육대학교[본교]": {
+    "code": "0000189",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000189&searchSyr=2026"
+  },
+  "한국성서대학교[본교]": {
+    "code": "0000191",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000191&searchSyr=2026"
+  },
+  "한국외국어대학교[본교]": {
+    "code": "0000192",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000192&searchSyr=2026"
+  },
+  "한국체육대학교[본교]": {
+    "code": "0000032",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000032&searchSyr=2026"
+  },
+  "한국침례신학대학교[본교]": {
+    "code": "0000182",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000182&searchSyr=2026"
+  },
+  "한국항공대학교[본교]": {
+    "code": "0000194",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000194&searchSyr=2026"
+  },
+  "한남대학교[본교]": {
+    "code": "0000195",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000195&searchSyr=2026"
+  },
+  "한동대학교[본교]": {
+    "code": "0000196",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000196&searchSyr=2026"
+  },
+  "한라대학교[본교]": {
+    "code": "0000197",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000197&searchSyr=2026"
+  },
+  "한림대학교[본교]": {
+    "code": "0000198",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000198&searchSyr=2026"
+  },
+  "한서대학교[본교]": {
+    "code": "0000199",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000199&searchSyr=2026"
+  },
+  "한성대학교[본교]": {
+    "code": "0000200",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000200&searchSyr=2026"
+  },
+  "한세대학교[본교]": {
+    "code": "0000201",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000201&searchSyr=2026"
+  },
+  "한신대학교[본교]": {
+    "code": "0000202",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000202&searchSyr=2026"
+  },
+  "한양대학교(ERICA)[분교]": {
+    "code": "0000204",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000204&searchSyr=2026"
+  },
+  "한양대학교[본교]": {
+    "code": "0000203",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000203&searchSyr=2026"
+  },
+  "한일장신대학교[본교]": {
+    "code": "0000206",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000206&searchSyr=2026"
+  },
+  "협성대학교[본교]": {
+    "code": "0000207",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000207&searchSyr=2026"
+  },
+  "호남대학교[본교]": {
+    "code": "0000208",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000208&searchSyr=2026"
+  },
+  "호남신학대학교[본교]": {
+    "code": "0000209",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000209&searchSyr=2026"
+  },
+  "호서대학교[본교]": {
+    "code": "0000211",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000211&searchSyr=2026"
+  },
+  "호원대학교[본교]": {
+    "code": "0000282",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000282&searchSyr=2026"
+  },
+  "홍익대학교[본교]": {
+    "code": "0000212",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000212&searchSyr=2026"
+  },
+  "홍익대학교[제2캠퍼스]": {
+    "code": "0002949",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0002949&searchSyr=2026"
+  },
+  "화성의과학대학교[본교]": {
+    "code": "0000233",
+    "url": "https://www.adiga.kr/ucp/uvt/uni/univDetail.do?menuId=PCUVTINF2000&unvCd=0000233&searchSyr=2026"
+  }
+}
