@@ -22,6 +22,7 @@ from backend.rag.tools import (
     get_universities_by_department,
     get_major_career_info,
     get_search_help,
+    get_university_admission_info,
 )
 
 from backend.config import get_llm
@@ -46,6 +47,7 @@ tools = [
     get_universities_by_department,
     get_major_career_info,
     get_search_help,
+    get_university_admission_info,
 ]  # 사용 가능한 툴 목록
 llm_with_tools = llm.bind_tools(tools)  # LLM에 툴 사용 권한 부여
 
@@ -181,6 +183,37 @@ def _summarize_major_hits(hits, aggregated_scores, limit: int = 10):
     return ordered[:limit]
 
 
+def _normalize_majors_with_llm(raw_majors: list[str]) -> list[str]:
+    """
+    LLM을 사용하여 사용자가 입력한 전공명(줄임말, 오타 등)을 표준 전공명으로 변환합니다.
+    예: ["컴공", "화공"] -> ["컴퓨터공학과", "화학공학과"]
+    """
+    if not raw_majors:
+        return []
+
+    # 입력이 너무 많으면 처리 비용이 크므로 제한
+    targets = raw_majors[:5]
+    
+    prompt = (
+        "사용자가 입력한 대학 전공명(줄임말, 오타 포함)을 가장 적절한 '표준 학과명'으로 변환해주세요.\n"
+        "반드시 한국어 학과명만 쉼표(,)로 구분하여 출력하세요. 설명이나 다른 말은 하지 마세요.\n\n"
+        f"입력: {', '.join(targets)}\n"
+        "출력:"
+    )
+    
+    try:
+        response = llm.invoke(prompt)
+        content = response.content.strip()
+        
+        # 쉼표로 분리하여 리스트로 변환
+        normalized = [item.strip() for item in content.split(",") if item.strip()]
+        print(f"🤖 LLM Normalized Majors: {targets} -> {normalized}")
+        return normalized
+    except Exception as e:
+        print(f"⚠️ Failed to normalize majors with LLM: {e}")
+        return targets  # 실패 시 원본 반환
+
+
 def recommend_majors_node(state: MentorState) -> dict:
     """
     Build a user profile embedding from onboarding answers and rank majors.
@@ -218,11 +251,17 @@ def recommend_majors_node(state: MentorState) -> dict:
             preferred_list = []
         
         if preferred_list:
+            # 🤖 LLM을 통한 전공명 정규화 (줄임말/오타 보정)
+            normalized_list = _normalize_majors_with_llm(preferred_list)
+            
+            # 원본과 정규화된 리스트를 합쳐서 검색 (혹시 모를 변환 오류 대비)
+            search_targets = list(set(preferred_list + normalized_list))
+            
             # tools.py의 검색 함수 사용하여 선호 전공 별도 검색
             from backend.rag.tools import _find_majors, _MAJOR_ID_MAP, _ensure_major_records
             _ensure_major_records()
             
-            for preferred in preferred_list:
+            for preferred in search_targets:
                 print(f"🔍 Searching for preferred major: '{preferred}'")
                 
                 # 선호 전공 검색 (정확 매칭 + 벡터 검색)
@@ -344,7 +383,8 @@ def agent_node(state: MentorState) -> dict:
                 "1. list_departments: 학과 목록 검색\n"
                 "2. get_universities_by_department: 특정 학과를 개설한 대학 검색\n"
                 "3. get_major_career_info: 전공별 직업/진출 분야 확인\n"
-                "4. get_search_help: 검색 도움말\n\n"
+                "4. get_university_admission_info: 대학별 입시 정보(정시컷, 수시컷) 조회\n"
+                "5. get_search_help: 검색 도움말\n\n"
                 "학생의 원래 질문을 다시 읽고, 적절한 툴을 **지금 즉시** 호출하세요."
             ))
             messages.append(error_message)
