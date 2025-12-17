@@ -6,8 +6,6 @@ charset-normalizer==3.4.4
 click==8.3.1
 cryptography==42.0.5
 distro==1.9.0
-django==5.2.9
-gunicorn==21.2.0
 greenlet==3.2.4
 h11==0.16.0
 httpx==0.28.1
@@ -20,12 +18,10 @@ langchain-openai==1.0.3
 langchain-pinecone==0.2.13
 langchain-text-splitters==1.0.0
 langchain==1.0.7
-langchain-community==0.4.1
 langgraph==1.0.3
 mysqlclient==2.2.7
 openai==2.8.1
 packaging==25.0
-# pandas removed (unused)
 Pillow==10.2.0
 pinecone-client==6.0.0
 pydantic==2.12.4
@@ -40,5 +36,4 @@ tqdm==4.67.1
 typing_extensions==4.15.0
 tzdata==2025.2
 urllib3==2.3.0
-uvicorn==0.38.0
 zstandard==0.25.0
