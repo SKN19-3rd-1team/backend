@@ -100,17 +100,17 @@ Unigo/
 
 ```mermaid
 flowchart TD
-    User([User (Terminal)]) -->|Input Text| CLI[cli.py]
+    User(["User (Terminal)"]) -->|Input Text| CLI[cli.py]
     CLI -->|Call| Main[backend.main]
 
     subgraph Backend ["Backend Logic"]
         Main -->|Invoke| Graph[LangGraph Agent]
 
-        Graph -->|Reasoning| LLM[OpenAI GPT-4o]
+        Graph -->|Reasoning| LLM["LLM (OpenAI GPT-4o)"]
         Graph -->|Tool Call| Tools[RAG Tools]
 
-        Tools -->|Query| MySQL[(MySQL DB)]
-        Tools -->|Search| Pinecone[(Pinecone Vector DB)]
+        Tools -->|Query| MySQL[("MySQL DB")]
+        Tools -->|Search| Pinecone[("Pinecone Vector DB")]
     end
 
     Graph -->|Stream Response| CLI
