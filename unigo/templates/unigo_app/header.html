@@ -1,0 +1,22 @@
+<header class="top-nav">
+    <div class="nav-inner">
+        <a href="{% url 'unigo_app:chat' %}" class="nav-brand">Unigo</a>
+        <div class="nav-menu">
+            {% if user.is_authenticated %}
+            <a href="{% url 'unigo_app:logout' %}" class="nav-link" id="btn-logout">Logout</a>
+            {% else %}
+
+                {% if request.resolver_match.url_name == "auth" %}
+                <a class="nav-link btn-login" id="btn-login">Login</a>
+                {% else %}
+                <a href="{% url 'unigo_app:auth' %}" class="nav-link" id="btn-login">Login</a>
+                {% endif %}
+
+            {% endif %}
+            <a href="{% url 'unigo_app:setting' %}" class="nav-link" id="btn-setting">Setting</a>
+        </div>
+    </div>
+</header>
+
+{% block extra_js %}
+{% endblock %}

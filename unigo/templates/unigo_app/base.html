@@ -1,0 +1,155 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Unigo{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}?v={% now 'U' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inria+Serif:wght@700&family=Inter:wght@400&family=Roboto:wght@400&display=swap"
+        rel="stylesheet">
+        <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/favicon/apple-touch-icon.png' %}">
+        <link rel="icon" type="image/png" sizes="96x96" href="{% static 'images/favicon/favicon-96x96.png' %}">
+        <link rel="icon" type="image/svg+xml" href="{% static 'images/favicon/favicon.svg' %}">
+        <link rel="icon" href="{% static 'images/favicon/favicon.ico' %}">
+        <link rel="manifest" href="{% static 'images/favicon/site.webmanifest' %}">   
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+    <div class="page-wrapper">
+        {% include "unigo_app/header.html" %}
+        <main class="main-area" id="main-area">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- 로그인 모달 -->
+    <div class="popup-modal" id="login-modal" aria-hidden="true">
+        <div class="popup-modal-overlay" id="login-overlay"></div>
+
+        <div class="popup-modal-content" role="dialog" aria-modal="true">
+            <button class="popup-modal-close" id="btn-login-close">×</button>
+
+            <h2 class="popup-modal-title">Login</h2>
+
+            <form class="popup-modal-form" onsubmit="return false;">
+
+                <label class="popup-field">
+                    <span class="popup-label">* 이메일 또는 아이디</span>
+                    <input type="text" id="login-email" class="popup-input" placeholder="example@you.com 또는 username"
+                        required />
+                </label>
+
+                <label class="popup-field">
+                    <span class="popup-label">* 비밀번호</span>
+                    <input type="password" id="login-password" class="popup-input" placeholder="Password" required />
+                </label>
+
+                <button class="popup-btn-primary" id="btn-login-confirm">로그인</button>
+            </form>
+
+            <div class="login-modal-footer">
+                <a href="#" class="login-forgot-link" id="link-forgot-password">Forgot password</a>
+
+                <div class="login-signup-row" id="link-signup">
+                    <span>Don't have an account?</span>
+                    <a href="#" class="signup-link">Sign up</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 회원가입 모달 -->
+    <div class="popup-modal" id="signup-modal" aria-hidden="true">
+        <div class="popup-modal-overlay" id="signup-overlay"></div>
+
+        <div class="popup-modal-content" role="dialog" aria-modal="true">
+            <button class="popup-modal-close" id="btn-signup-close">×</button>
+
+            <h2 class="popup-modal-title">Sign up</h2>
+
+            <form class="popup-modal-form" onsubmit="return false;">
+                <div class="popup-email-row">
+                    <label class="popup-field">
+                        <span class="popup-label">* 이메일</span>
+                        <input type="email" id="signup-email" class="popup-input" placeholder="example@you.com"
+                            required />
+                    </label>
+                    <button class="popup-auth-btn-primary" id="btn-email-confirm">인증</button>
+                </div>
+
+                <div class="popup-email-row">
+                    <label class="popup-field">
+                        <span class="popup-label">* 닉네임 (아이디)</span>
+                        <input type="text" id="signup-username" class="popup-input" placeholder="Hong Gildong"
+                            required />
+                    </label>
+                    <button class="popup-auth-btn-primary" id="btn-username-confirm">인증</button>
+                </div>
+
+                <label class="popup-field">
+                    <span class="popup-label">* 비밀번호</span>
+                    <input type="password" id="signup-password" class="popup-input" placeholder="Password" required />
+                </label>
+
+                <label class="popup-field">
+                    <span class="popup-label">* 비밀번호 확인</span>
+                    <input type="password" id="signup-password-check" class="popup-input" placeholder="Password Check"
+                        required />
+                </label>
+
+                <button class="popup-btn-primary" id="btn-signup-confirm">회원가입 완료</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 회원가입 완료 모달 -->
+    <div class="popup-modal" id="signup-complete-modal" aria-hidden="true">
+        <div class="popup-modal-overlay" id="signup-complete-overlay"></div>
+
+        <div class="popup-modal-content" role="dialog" aria-modal="true">
+            <button class="popup-modal-close" id="btn-signup-complete-close">×</button>
+
+            <h2 class="popup-modal-title">회원가입이 완료되었습니다!</h2>
+        </div>
+    </div>
+
+    <!-- 비밀번호 찾기 모달 -->
+    <div class="popup-modal" id="find-password-modal" aria-hidden="true">
+        <div class="popup-modal-overlay" id="find-password-overlay"></div>
+
+        <div class="popup-modal-content" role="dialog" aria-modal="true">
+            <button class="popup-modal-close" id="btn-find-password-close">×</button>
+
+            <h2 class="popup-modal-title">비밀번호 찾기</h2>
+
+            <form class="popup-modal-form" onsubmit="return false;">
+
+                <label class="popup-field">
+                    <span class="popup-label">* 이메일</span>
+                    <input type="email" class="popup-input" placeholder="example@you.com" required />
+                </label>
+
+                <div class="login-modal-footer">
+                    가입하신 이메일 주소로 임시 비밀번호를 전송합니다.<br>
+                    로그인 후, 새로운 비밀번호로 업데이트하세요.
+                </div>
+
+                <button class="popup-btn-primary" id="btn-temp-password">임시 비밀번호 받기</button>
+                <button class="popup-btn-primary2" id="btn-return-login">로그인 화면으로 돌아가기</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{% static 'js/csrf.js' %}"></script>
+    <script src="{% static 'js/script.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

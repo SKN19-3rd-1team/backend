@@ -1,0 +1,55 @@
+# Git
+.git
+.gitignore
+
+# Environment Variables (Secrets)
+.env
+.env.*
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Docker
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
+Dockerfile
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets (Additions from .gitignore)
+secrets.json
+local_settings.py
+
+# Django Data & Media
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# Large Data
+backend/data/vector_db/
+
+# Dependencies
+node_modules/
+
+# Agent & Tools
+.agent/
+.claude/
+AGENTS.md
+CLAUDE.md

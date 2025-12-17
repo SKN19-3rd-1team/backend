@@ -1,0 +1,160 @@
+{% extends "unigo_app/base.html" %}
+{% load static %}
+{% block title %}Settings - Unigo{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/setting.css' %}?v={% now 'U' %}">
+{% endblock %}
+
+{% block content %}
+<div class="setting-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-user-box">
+            <div class="sidebar-avatar">
+                {% if custom_image_url %}
+                <img src="{{ custom_image_url }}" alt="Profile"
+                    style="width:100%; height:100%; object-fit:contain; border-radius:50%;">
+                {% else %}
+                <img src="{% static 'images/'|add:character_image|add:'.png' %}" alt="Profile"
+                    style="width:100%; height:100%; object-fit:contain;">
+                {% endif %}
+            </div>
+            <div class="sidebar-username">{{ user.username }}</div>
+            <div class="sidebar-email">{{ user.email }}</div>
+        </div>
+        <div class="sidebar-menu-box">
+            <div class="sidebar-btn active" data-target="section-account">계정 설정</div>
+            <!-- [NEW] 캐릭터 설정 페이지로 이동 -->
+            <a href="{% url 'unigo_app:character_select' %}" class="sidebar-btn"
+                style="text-decoration:none; color:inherit; display:block;">캐릭터 설정</a>
+
+            <!-- Custom Image Upload -->
+            <div style="padding: 10px 20px;">
+                <label for="custom-image-upload"
+                    style="cursor:pointer; display:block; padding:10px; background:#eee; text-align:center; border-radius:8px; font-size:0.9rem;">
+                    이미지 파일 업로드
+                </label>
+                <input type="file" id="custom-image-upload" accept="image/*" style="display:none;">
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Panel -->
+    <div class="setting-panel">
+
+        <!-- [SECTION] Account Settings (Existing) -->
+        <section id="section-account" class="setting-section">
+            <h1 class="setting-title">계정 설정</h1>
+            <p class="setting-desc">개인정보 및 보안 설정을 관리합니다.</p>
+
+            <!-- Tabs Navigation -->
+            <div class="setting-tabs">
+                <div class="tab-btn active" data-tab="nickname">닉네임 변경</div>
+                <div class="tab-btn" data-tab="password">비밀번호 변경</div>
+                <div class="tab-btn" data-tab="dangerzone">계정 삭제</div>
+            </div>
+
+            <!-- Nickname Tab -->
+            <div class="tab-content active" id="tab-nickname">
+                <form id="form-nickname" onsubmit="return false;">
+                    <div class="form-group">
+                        <label class="input-label">새 닉네임</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="text" class="form-input" id="nickname-input" placeholder="새로운 닉네임을 입력하세요">
+                            <button type="button" class="btn-secondary" id="btn-check-duplicate" style="white-space: nowrap;">
+                                중복 확인
+                            </button>
+                        </div>
+                        <div class="error-msg" id="nickname-error"></div>
+                        <div class="success-msg" id="nickname-success">사용 가능한 닉네임입니다.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="input-label">현재 비밀번호</label>
+                        <input type="password" class="form-input" id="nickname-password"
+                            placeholder="본인 확인을 위해 비밀번호를 입력해주세요">
+                    </div>
+
+                    <button type="submit" class="setting-btn-primary" id="btn-save-nickname">변경 내용 저장</button>
+                </form>
+            </div>
+
+            <!-- Password Tab -->
+            <div class="tab-content" id="tab-password">
+                <form id="form-password" onsubmit="return false;">
+                    <div class="form-group">
+                        <label class="input-label">현재 비밀번호</label>
+                        <input type="password" class="form-input" id="current-password" placeholder="현재 비밀번호">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="input-label">새 비밀번호</label>
+                        <input type="password" class="form-input" id="new-password" placeholder="새 비밀번호">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="input-label">새 비밀번호 확인</label>
+                        <input type="password" class="form-input" id="new-password-confirm"
+                            placeholder="새 비밀번호를 다시 입력하세요">
+                        <div class="error-msg" id="password-match-error">비밀번호가 일치하지 않습니다.</div>
+                    </div>
+
+                    <button type="submit" class="setting-btn-primary" id="btn-save-password">변경 내용 저장</button>
+                </form>
+            </div>
+            <!-- Dangerzone Tab -->
+
+            <div class="tab-content" id="tab-dangerzone">
+
+                <form id="form-dangerzone" onsubmit="return false;">
+
+                    <div class="form-group">
+
+                        <label class="input-label">계정 삭제 확인</label>
+
+                        <input type="text" class="form-input" id="delete-confirm" placeholder="'삭제하겠습니다'를 입력하세요">
+
+                        <div class="error-msg" id="delete-confirm-error"></div>
+
+                    </div>
+
+
+
+                    <div class="form-group">
+
+                        <label class="input-label">현재 비밀번호</label>
+
+                        <input type="password" class="form-input" id="delete-password"
+                            placeholder="본인 확인을 위해 비밀번호를 입력해주세요">
+
+                        <div class="error-msg" id="delete-password-error"></div>
+
+                    </div>
+
+
+
+                    <button type="submit" class="setting-btn-primary" id="btn-delete-account">계정 삭제</button>
+
+                </form>
+
+            </div>
+
+        </section>
+    </div>
+</div>
+
+
+
+
+</div>
+
+</div>
+{% endblock %}
+
+
+
+{% block extra_js %}
+<script src="{% static 'js/setting.js' %}"></script>
+
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "unigo_app/base.html" %} {% load static %} {% block title %}Character
+Select - Unigo{% endblock %} {% block extra_head %}
+<!-- Re-use setting.css or chat.css if needed, but we might need specific styles for the carousel if they were inline or in a specific file. 
+     Assuming they were in styles.css or similar. If they were in setting.css, we should include it. -->
+<link rel="stylesheet" href="{% static 'css/character_select.css' %}" />
+
+{% endblock %} {% block content %}
+<div class="character-page-container">
+  <h1 class="page-title">캐릭터 선택</h1>
+
+  <!-- Reuse the Carousel HTML structure -->
+  <div class="carousel-scene" style="margin-bottom: 20px">
+    <div class="carousel-3d" id="carousel3d">
+      <!-- JS will populate items -->
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="control-btn" id="prevBtn">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+
+    <div class="character-info-box" id="characterInfo">
+      <h2 class="character-info-name" id="characterName">토끼</h2>
+      <p class="character-info-desc" id="characterDesc">
+        활발하고 호기심 많은 성격
+      </p>
+    </div>
+
+    <button class="control-btn" id="nextBtn">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+    </button>
+  </div>
+
+  <div class="action-buttons">
+    <button class="btn-cancel" id="cancelBtn" data-url="{% url 'unigo_app:setting' %}">취소</button>
+    <button class="btn-save" id="saveBtn" data-next-url="{% url 'unigo_app:setting' %}">선택 및 저장</button>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script src="{% static 'js/character_select.js' %}"></script>
+{% endblock %}

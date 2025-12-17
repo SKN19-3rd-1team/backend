@@ -10,14 +10,16 @@ from __future__ import annotations
 # backend/rag/loader.py
 import json
 import re
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
-from backend.config import get_settings, resolve_path
+from backend.config import get_settings
 
 
 # ==================== Major Detail Loading ====================
+
 
 # JSON 전공 데이터를 구조화한 레코드 모델
 @dataclass
@@ -64,16 +66,43 @@ class MajorDoc:
     text: str
     cluster: Optional[str] = None
     salary: Optional[float] = None
+    employment_rate: Optional[float] = None
+    acceptance_rate: Optional[float] = None
     relate_subject_tags: list[str] = field(default_factory=list)
     job_tags: list[str] = field(default_factory=list)
     raw_subjects: Optional[str] = None
     raw_jobs: Optional[str] = None
 
 
+@dataclass
+class UniversityMajorDoc:
+    """
+    대학별 구체적 학과 정보를 Pinecone에 인덱싱하기 위한 문서 구조.
+    Namespace: university_majors
+    """
+
+    doc_id: str
+    major_id: str
+    university: str
+    department: str
+    major_name: str  # 표준 학과명 (대분류)
+    text: str  # 검색용 텍스트 (예: "연세대학교 인공지능융합대학")
+
+
 def _slugify(value: str) -> str:
     # 전공명을 Pinecone 문서 ID로 활용하기 위해 안전한 슬러그 형태로 변환
+    # Pinecone Serverless는 ASCII ID만 지원함.
+    # 영문/숫자는 보존하고, 한글 등은 해시로 변환.
+
+    # 1. 시도: ASCII 변환
     slug = re.sub(r"[^0-9a-zA-Z]+", "-", value.strip().lower())
     slug = slug.strip("-")
+
+    # 2. 식별 불가능할 정도로 짧으면 해시 사용 (예: 순수 한글 문자열)
+    if len(slug) < 2:
+        m = hashlib.md5(value.encode("utf-8"))
+        return f"id-{m.hexdigest()}"
+
     return slug
 
 
@@ -107,12 +136,12 @@ def _calculate_acceptance_rate(chart_data: Any) -> Optional[float]:
     """
     if not chart_data or not isinstance(chart_data, list) or not chart_data:
         return None
-    
+
     # chartData는 리스트이고 첫 번째 요소에 모든 데이터가 있음
     stats = chart_data[0]
     if not isinstance(stats, dict):
         return None
-        
+
     applicants_list = stats.get("applicant")
     if not applicants_list or not isinstance(applicants_list, list):
         return None
@@ -125,7 +154,7 @@ def _calculate_acceptance_rate(chart_data: Any) -> Optional[float]:
             continue
         label = item.get("item")
         data_str = item.get("data", "0")
-        
+
         try:
             val = float(data_str)
             if label == "지원자":
@@ -138,7 +167,7 @@ def _calculate_acceptance_rate(chart_data: Any) -> Optional[float]:
     if applicant_count > 0:
         rate = (entrant_count / applicant_count) * 100
         return round(rate, 1)
-        
+
     return None
 
 
@@ -167,67 +196,76 @@ def load_major_detail(path: str | Path | None = None) -> list[MajorRecord]:
     """
     # 기본 경로는 설정값(MAJOR_DETAIL_PATH)을 사용
     settings = get_settings()
-    json_path = Path(resolve_path(path if path else settings.major_detail_path))
-    data = json.loads(json_path.read_text(encoding="utf-8"))
 
-    records: list[MajorRecord] = []
-    seen_ids: dict[str, int] = {}
+    # 1. MySQL에서 데이터 로드 시도
+    if settings.mysql_host and settings.mysql_user:
+        try:
+            from backend.db.connection import SessionLocal
+            from backend.db.models import Major
+            from sqlalchemy import text
 
-    for block_index, block in enumerate(data):
-        contents: Sequence[dict[str, Any]] = block.get("dataSearch", {}).get("content", []) or []
-        for content_index, payload in enumerate(contents):
-            major_name = (payload.get("major") or "").strip()
-            base_slug = _slugify(major_name) or f"major-{block_index}-{content_index}"
-            dedup_idx = seen_ids.get(base_slug, 0)
-            seen_ids[base_slug] = dedup_idx + 1
-            major_id = base_slug if dedup_idx == 0 else f"{base_slug}-{dedup_idx}"
+            db = SessionLocal()
+            try:
+                # 테이블 존재 여부 확인 (간단한 쿼리)
+                db.execute(text("SELECT 1 FROM majors LIMIT 1"))
 
-            salary = _parse_salary(payload.get("salary"))
-            department_aliases = _split_multi_value(payload.get("department", ""))
-            
-            # chartData 처리
-            chart_data = payload.get("chartData")
-            acceptance_rate = _calculate_acceptance_rate(chart_data)
-            
-            # 통계 데이터 추출 (chartData[0] 내부에 존재)
-            gender_stats = None
-            satisfaction_stats = None
-            employment_rate_stats = None
-            
-            if chart_data and isinstance(chart_data, list) and len(chart_data) > 0:
-                stats_block = chart_data[0]
-                if isinstance(stats_block, dict):
-                    gender_stats = stats_block.get("gender")
-                    satisfaction_stats = stats_block.get("satisfaction")
-                    employment_rate_stats = stats_block.get("employment_rate")
+                db_records = db.query(Major).all()
+                if db_records:
+                    print(f"✅ Loaded {len(db_records)} records from MySQL database.")
+                    results = []
+                    for row in db_records:
+                        # DB 모델 -> MajorRecord 변환
+                        record = MajorRecord(
+                            major_id=row.major_id,
+                            major_name=row.major_name,
+                            cluster=None,
+                            summary=row.summary or "",
+                            interest=row.interest or "",
+                            property=row.property or "",
+                            relate_subject=row.relate_subject,
+                            job=row.job or "",
+                            enter_field=row.enter_field,
+                            salary=row.salary,
+                            employment=row.employment,
+                            employment_rate=row.employment_rate,
+                            acceptance_rate=row.acceptance_rate,
+                            department_aliases=row.department_aliases or [],
+                            career_act=row.career_act,
+                            qualifications=row.qualifications,
+                            main_subject=row.main_subject,
+                            university=json.loads(row.university)
+                            if row.university
+                            else [],
+                            chart_data=row.chart_data,
+                            raw=row.raw_data or {},
+                            gender=None,  # DB 컬럼에 없으면 none 또는 추가 필요
+                            satisfaction=None,
+                        )
+                        # gender/satisfaction 통계는 chart_data에서 다시 추출하거나 컬럼 추가 필요
+                        # 여기서는 chart_data가 있으면 다시 계산하도록 처리 가능하지만
+                        # 일단 있는 데이터로 채워넣음
+                        if row.chart_data and isinstance(row.chart_data, list):
+                            stats_block = row.chart_data[0]
+                            if isinstance(stats_block, dict):
+                                record.gender = stats_block.get("gender")
+                                record.satisfaction = stats_block.get("satisfaction")
+                                # employment_rate는 별도 컬럼으로 저장했으므로 덮어쓰지 않아도 됨
 
-            record = MajorRecord(
-                major_id=major_id,
-                major_name=major_name or f"미확인 전공 {len(records) + 1}",
-                cluster=payload.get("cluster"),
-                summary=(payload.get("summary") or "").strip(),
-                interest=(payload.get("interest") or "").strip(),
-                property=(payload.get("property") or "").strip(),
-                relate_subject=payload.get("relate_subject"),
-                job=(payload.get("job") or "").strip(),
-                enter_field=payload.get("enter_field"),
-                salary=salary,
-                employment=payload.get("employment"),
-                gender=gender_stats,
-                satisfaction=satisfaction_stats,
-                employment_rate=employment_rate_stats,
-                acceptance_rate=acceptance_rate,
-                department_aliases=department_aliases,
-                career_act=payload.get("career_act"),
-                qualifications=payload.get("qualifications"),
-                main_subject=payload.get("main_subject"),
-                university=payload.get("university"),
-                chart_data=chart_data,
-                raw=payload,
-            )
-            records.append(record)
+                        results.append(record)
+                    return results
+            except Exception as e:
+                print(f"⚠️ MySQL load failed (falling back to JSON): {e}")
+            finally:
+                db.close()
+        except ImportError:
+            pass
 
-    return records
+    # 2. JSON 파일에서 로드 (Fallback - Removed)
+    # Refactored to only use MySQL Database
+    print(
+        "⚠️ JSON fallback has been removed. Please ensure MySQL database is populated."
+    )
+    return []
 
 
 def _unique_preserve_order(values: Sequence[str]) -> list[str]:
@@ -259,7 +297,9 @@ def _extract_subject_tags(relate_subject: Any) -> list[str]:
     return _unique_preserve_order(tags)
 
 
-def _format_subject_text(relate_subject: Any) -> tuple[Optional[str], list[str], Optional[str]]:
+def _format_subject_text(
+    relate_subject: Any,
+) -> tuple[Optional[str], list[str], Optional[str]]:
     # 과목 리스트를 사람이 읽을 수 있는 텍스트와 태그 목록으로 변환
     if not isinstance(relate_subject, list):
         return None, [], None
@@ -278,9 +318,7 @@ def _format_subject_text(relate_subject: Any) -> tuple[Optional[str], list[str],
     if not lines:
         return None, [], None
 
-    text = (
-        "관련 과목 안내:\n" + "\n".join(f"- {line}" for line in lines)
-    )
+    text = "관련 과목 안내:\n" + "\n".join(f"- {line}" for line in lines)
     raw_block = "\n".join(lines)
     tags = _extract_subject_tags(relate_subject)
     return text, tags, raw_block
@@ -298,7 +336,9 @@ def _extract_job_tags(job_text: str) -> list[str]:
     return _unique_preserve_order(tags)
 
 
-def _format_job_text(job_text: str, enter_field: Any) -> tuple[Optional[str], list[str], Optional[str]]:
+def _format_job_text(
+    job_text: str, enter_field: Any
+) -> tuple[Optional[str], list[str], Optional[str]]:
     # 직업/진출분야 정보를 하나의 설명 텍스트로 합치고 태그를 뽑아냄
     lines: list[str] = []
     if job_text:
@@ -337,6 +377,10 @@ def build_major_docs(record: MajorRecord) -> list[MajorDoc]:
             text=text.strip(),
             cluster=record.cluster,
             salary=record.salary,
+            employment_rate=record.employment_rate
+            if isinstance(record.employment_rate, (int, float))
+            else None,
+            acceptance_rate=record.acceptance_rate,
             relate_subject_tags=extra.get("relate_subject_tags", []),
             job_tags=extra.get("job_tags", []),
             raw_subjects=extra.get("raw_subjects"),
@@ -360,13 +404,17 @@ def build_major_docs(record: MajorRecord) -> list[MajorDoc]:
                 elif description:
                     activities.append(description)
             if activities:
-                interest_text = f"{interest_text}\n\n추천 활동:\n" + "\n".join(f"- {item}" for item in activities)
+                interest_text = f"{interest_text}\n\n추천 활동:\n" + "\n".join(
+                    f"- {item}" for item in activities
+                )
         docs.append(make_doc("interest", interest_text))
 
     if record.property:
         docs.append(make_doc("property", record.property))
 
-    subjects_text, subject_tags, raw_subjects = _format_subject_text(record.relate_subject)
+    subjects_text, subject_tags, raw_subjects = _format_subject_text(
+        record.relate_subject
+    )
     if subjects_text:
         docs.append(
             make_doc(
@@ -398,4 +446,50 @@ def build_all_major_docs(records: list[MajorRecord]) -> list[MajorDoc]:
     docs: list[MajorDoc] = []
     for record in records:
         docs.extend(build_major_docs(record))
+    return docs
+
+
+def build_university_major_docs(record: MajorRecord) -> list[UniversityMajorDoc]:
+    """
+    전공 레코드에서 대학-학과 쌍을 추출하여 UniversityMajorDoc 리스트를 생성한다.
+    """
+    docs: list[UniversityMajorDoc] = []
+
+    if not isinstance(record.university, list):
+        return docs
+
+    seen = set()
+
+    for item in record.university:
+        if not isinstance(item, dict):
+            continue
+
+        school = (item.get("schoolName") or "").strip()
+        major_name = (item.get("majorName") or "").strip()
+
+        # 대학명이 없거나, 학과명이 없는 경우 스킵 (엄격한 매핑을 위해)
+        if not school or not major_name:
+            continue
+
+        # 고유 ID 생성 (대학명+학과명)
+        doc_id = _slugify(f"{school}-{major_name}")
+
+        if doc_id in seen:
+            continue
+        seen.add(doc_id)
+
+        # 검색용 텍스트 생성: "{대학명} {학과명}"
+        text = f"{school} {major_name}"
+
+        docs.append(
+            UniversityMajorDoc(
+                doc_id=doc_id,
+                major_id=record.major_id,
+                university=school,
+                department=major_name,
+                major_name=record.major_name,
+                text=text,
+            )
+        )
+
     return docs

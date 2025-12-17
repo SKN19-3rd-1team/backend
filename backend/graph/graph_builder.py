@@ -3,8 +3,8 @@
 LangGraph 그래프를 빌드하는 팩토리 함수들을 정의합니다.
 
 이 파일은 두 가지 다른 그래프 구조를 생성합니다:
-1. **ReAct 그래프**: LLM이 자율적으로 tool을 호출하는 에이전트 패턴
-2. **Major 그래프**: 온보딩 기반 전공 추천 전용
+1. **ReAct 그래프**: LLM이 자율적으로 tool을 호출하는 에이전트 패턴. 대화형 멘토링에 사용됩니다.
+2. **Major 그래프**: 온보딩 정보를 바탕으로 전공을 추천하는 단방향 파이프라인. 초기 추천에 사용됩니다.
 """
 
 from langgraph.graph import StateGraph
@@ -12,9 +12,12 @@ from langgraph.constants import END
 from langgraph.prebuilt import ToolNode
 from .state import MentorState
 from .nodes import (
-    agent_node, should_continue, tools,
+    agent_node,
+    should_continue,
+    tools,
     recommend_majors_node,
 )
+
 
 def build_graph(mode: str = "react"):
     """
@@ -59,9 +62,9 @@ def build_react_graph():
     4. agent_node로 복귀: LLM이 tool 결과 보고 답변 생성
 
     ** 특징 **
-    - LLM이 자율적으로 tool 사용 결정
-    - 필요시 여러 번 tool 호출 가능 (반복 루프)
-    - Agentic한 동작
+    - LLM이 자율적으로 tool 사용 결정 (Adaptive)
+    - 필요시 여러 번 tool 호출 가능 (Looping) - 질문이 복잡할 경우 정보를 단계적으로 수집
+    - Agentic한 동작 - 상황에 맞춰 유연하게 대처
     """
     graph = StateGraph(MentorState)
 
@@ -81,8 +84,8 @@ def build_react_graph():
         should_continue,  # 라우팅 함수
         {
             "tools": "tools",  # tool_calls 있으면 tools 노드로
-            "end": END        # tool_calls 없으면 종료
-        }
+            "end": END,  # tool_calls 없으면 종료
+        },
     )
 
     # tools → agent (툴 실행 후 다시 에이전트로 복귀)
@@ -96,7 +99,18 @@ def build_react_graph():
 
 def build_major_graph():
     """
-    Graph dedicated to onboarding-based major recommendations.
+    온보딩 기반 전공 추천 전용 그래프를 빌드합니다.
+
+    ** 그래프 구조 **
+    ```
+    [시작] → recommend → [종료]
+    ```
+
+    ** 실행 플로우 **
+    1. recommend: 온보딩 데이터(`onboarding_answers`)를 입력받아 LLM 분석, Vector Search, Scoring을 순차적으로 수행
+    2. END: 추천 결과를 반환하고 종료
+
+    이 그래프는 에이전트 루프 없이 단방향(Single-pass)으로 실행되는 간단한 파이프라인입니다.
     """
     graph = StateGraph(MentorState)
     graph.add_node("recommend", recommend_majors_node)

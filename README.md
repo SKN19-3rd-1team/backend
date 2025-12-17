@@ -1,633 +1,585 @@
-# langchain_practice
+# SK네트웍스 Family AI 캠프 19기 4차 프로젝트
 
-## 실행 순서
+## 1. 팀 소개
 
-프로젝트를 처음부터 끝까지 실행하기 위해 필요한 명령어들을 순서대로 정리했습니다.
+### 팀명
 
-1. **환경 변수 파일 생성**
+**Unigo (유니고)** - University Go, 당신을 위한 대학 입시 가이드
 
-   ```bash
-   cp .env.example .env          # Windows PowerShell: copy .env.example .env
-   ```
+### 멤버
 
-   - 발급받은 `OPENAI_API_KEY`, `HUGGINGFACEHUB_API_TOKEN`, `LANGCHAIN_API_KEY`를 `.env`에 채웁니다.
-   - `RAW_JSON`, `VECTORSTORE_DIR`, `LLM_PROVIDER`, `MODEL_NAME`, `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL_NAME` 등을 환경에 맞게 조정하세요.
+<div align="center">
+  <table>
+  <tr>
+    <td align="center"> 
+			<img src="unigo/static/images/raccoon.png" width="200" alt="강지완">     
+			 <br/>
+      강지완
+      <br/>
+      <a href="https://github.com/Maroco0109">
+        <img src="https://img.shields.io/badge/GitHub-Maroco0109-181717?style=flat&logo=github&logoColor=white">
+      </a>
+    </td> 
+    <td align="center"> 
+			<img src="unigo/static/images/penguin.png" width="200" alt="김진">       
+			<br/>
+      김진
+      <br/>
+      <a href="https://github.com/KIMjjjjjjjj">
+        <img src="https://img.shields.io/badge/GitHub-KIMjjjjjjjj-181717?style=flat&logo=github&logoColor=white">
+      </a>
+    </td>
+    <td align="center"> 
+				<img src="unigo/static/images/turtle.png" width="200" alt="마한성">       
+			<br/>
+      마한성
+      <br/>
+      <a href="https://github.com/gitsgetit">
+        <img src="https://img.shields.io/badge/GitHub-gitsgetit-181717?style=flat&logo=github&logoColor=white">
+      </a>
+    </td> 
+    <td align="center"> 
+			<img src="unigo/static/images/bear.png" width="200" alt="오하원">      
+			<br/> 
+      오하원
+      <br/>
+      <a href="https://github.com/Hawon-Oh">
+        <img src="https://img.shields.io/badge/GitHub-Hawon--Oh-181717?style=flat&logo=github&logoColor=white">
+      </a>
+    </td> 
+  </tr>
+</table>
+</div>
 
-2. **가상환경 및 의존성 설치 (최초 1회)**
+---
 
-   ```bash
-   conda activate langchain_env
-   pip install -r requirements.txt
-   ```
+## 2. 프로젝트 변경 사항
 
-3. **벡터스토어 구축**
+> **"단순 정보 검색에서 개인화된 입시 멘토링 서비스로"**
+>
+> 이전 3차 프로젝트(공신2)의 한계를 분석하고, 기술적/기능적으로 대폭 개선했습니다.
 
-   ```bash
-   python -m backend.rag.build_major_index
-   ```
+### 주요 개선 포인트
 
-   - `.env`의 `RAW_JSON`(glob 가능)에서 코스를 읽어 LangChain `Document`로 변환하고, `VECTORSTORE_DIR` 경로에 Vector DB를 생성/갱신합니다.
-   - 원본 데이터나 임베딩 모델 설정을 바꿨다면 이 명령을 다시 실행하세요.
+| 구분            | 3차 프로젝트 (공신2)                    | **4차 프로젝트 (Unigo)**                    | 비고                             |
+| :-------------- | :-------------------------------------- | :------------------------------------------ | :------------------------------- |
+| **타겟/범위**   | 16개 대학 커리큘럼 중심 (제한적)        | **전국 대학 및 전체 전공 데이터** (확장)    | 입시생 전체로 타겟 확장          |
+| **데이터 원천** | 대학별 크롤링 (비정형 데이터)           | **공공 데이터 API & MySQL** (정제된 데이터) | 데이터 신뢰성 및 관리 효율 증대  |
+| **핵심 기술**   | **ReAct Agent & LangGraph** (추론형 AI) | **ReAct Agent & LangGraph** (추론형 AI)     | 일부 tool 변경                   |
+| **플랫폼**      | Streamlit (프로토타입)                  | **Django Web Application** (상용화 수준)    | 회원가입, 커스텀 UI/UX 구현 가능 |
+| **UX 전략**     | 기능 중심 Q&A                           | **페르소나(캐릭터) & 온보딩**               | 사용자 몰입감 및 친밀도 향상     |
 
-4. **Streamlit 챗봇 실행**
+### 개선 배경 및 원인
 
-   ```bash
-   streamlit run frontend/app.py
-   ```
+#### 초기 데이터 수집의 한계
 
-   - 터미널에 현재 사용 중인 LLM/임베딩 모델명이 출력되고, 브라우저에서 상담 챗봇 UI가 열립니다.
-   - 질문 입력 시 LangGraph 기반 RAG 파이프라인이 동작하여 답변을 생성합니다.
+- **크롤링 난이도**: 대학마다 상이한 홈페이지 양식과 보안(봇 탐지) 이슈로 인해 안정적인 데이터 수집이 어려움.
+- **데이터 파편화**: 학과명이 대학별로 제각각(예: 컴퓨터공학과, SW학부, AI전공...)이라 정규화 및 매핑이 매우 난해함.
+- **커리큘럼의 모호성**: 명확한 커리큘럼이 온라인에 공개되지 않은 대학이 많아 일관된 정보 제공 불가.
 
-## 프로젝트 구조
+#### 사용자 경험(UX) 저하
+
+- **제한된 커버리지**: 서울 주요 대학이나 이공계열 위주로 정보가 편중되어, 실제 사용자가 찾는 지방 대학이나 인문/예체능 계열 정보 누락.
+- **검색 실패**: 사용자가 원하는 결과가 없음(No Result)으로 나오는 빈도가 높아 서비스 만족도 하락.
+
+<br>
+
+### 데이터 소스 변경 및 전처리 과정
+
+#### 데이터 소스 (Data Sources)
+
+- **major_detail.json(커리어넷)**: 전공 상세 정보 (학과명, 요약, 흥미, 적성, 진출 분야, 관련 직업, 관련 자격증, 주요 교과목, 졸업 후 연봉, 취업률, 입학 경쟁률, 개설 대학 목록 등)
+- **university_data_cleaned.json(대학어디가)**: 대학별 정보 및 주소
+- **major_categories.json(커리어넷)**: 대분류 학과와 그에 해당하는 학과들 나열
+
+#### 전처리 파이프라인 (Processing Pipeline)
+
+1. **Data Ingestion (데이터 수집 및 로드)**
+   - 커리어넷 등에서 수집된 대용량 JSON 파일 로드 및 원본 데이터의 복잡한 중첩 구조(`dataSearch > content`) 파싱
+2. **Dual-Store Strategy (이원화 저장 전략)**
+   - **MySQL (Structured Data)**: 전공명, 취업률, 연봉 등 정형 데이터를 RDBMS 테이블 스키마에 맞춰 매핑 및 적재
+   - **Pinecone (Vector Data)**: 자연어 검색을 위해 전공 개요, 흥미, 적성 등 텍스트 데이터를 `MajorDoc` 문서 객체로 변환하여 임베딩 및 인덱싱
+3. **Optimization (인덱싱 최적화)**
+   - 데이터 특성에 따라 3가지 네임스페이스(`majors`, `major_categories`, `university_majors`)로 분리하여 벡터화 수행
+
+### 인프라 전환: Vector DB (Migration)
+
+> **Chroma DB (Local)** ➡️ **Pinecone (Serverless Cloud)**
+
+#### 전환 이유
+
+1.  **운영 복잡도 해소**: 로컬 DB 관리(Docker Volume, 파일 손상 등)의 부담을 덜고 완전 관리형(SaaS) 서비스 도입.
+2.  **Serverless 효율**: 트래픽이 없을 땐 비용이 0에 수렴하며, 필요시 즉각 스케일링되는 유연한 구조.
+
+#### 도입 효과
+
+- **Stateless 아키텍처**: 백엔드 컨테이너를 언제든 껐다 켜도 데이터 동기화 문제 없음 (Docker Compose 구성 단순화).
+- **개발 편의성**: 팀원 간 로컬 환경(OS, 디스크 경로 등) 차이 없이 동일한 API 키로 동일한 검색 결과 보장.
+
+
+
+#### 주요 기대 효과
+
+1.  **데이터 커버리지 100%**: 국내 존재하는 모든 대학 및 학과 정보 탑재.
+2.  **정교한 검색 경험**:
+    - **정확한 학과 검색**: "연세대학교에 컴퓨터 공학과가 있어?" → "연세대학교에는 "컴퓨터공학과"라는 명칭의 학과는 없지만, "인공지능학과"와 "첨단컴퓨팅학부"가 개설되어 있습니다. 이 두 학과는 컴퓨터 관련 분야와 밀접한 연관이 있습니다."
+3.  **One-Stop 입시 정보**: 단순 학과 소개를 넘어, 해당 학과가 개설된 대학 리스트와 입시처 링크까지 연결.
+
+#### 핵심 기능 (Tools) 구현
+
+| 기능(Tool)                       | 설명                             | 기술 스택                         |
+| :------------------------------- | :------------------------------- | :-------------------------------- |
+| `list_departments`               | 키워드/카테고리 기반 학과 추천   | **Pinecone** (Vector) + **MySQL** |
+| `get_universities_by_department` | 특정 전공 개설 대학 및 학과 매칭 | **Pinecone** + **MySQL**          |
+| `get_major_career_info`          | 진로, 연봉, 취업률 등 상세 정보  | **MySQL** (CareerNet Data)        |
+| `get_university_admission_info`  | 대학별 입시 요강 페이지 연결     | **MySQL** (Adiga Data)            |
+
+<br>
+
+
+---
+
+## 3. 프로젝트 개요
+
+### 프로젝트 명
+
+**Unigo (AI 기반 대학 전공 추천 및 입시 상담 챗봇)**
+
+### 프로젝트 소개
+
+LLM(Large Language Model)과 RAG(Retrieval Augmented Generation) 기술을 활용하여 수험생과 진로를 고민하는 학생들에게 **개인 맞춤형 전공 추천**과 **정확한 입시 정보**를 제공하는 대화형 AI 서비스입니다.
+
+### 프로젝트 필요성 (배경)
+
+- **정보의 비대칭성**: 대학 입시 정보는 **방대하고 파편화**되어 있어 학생들이 자신에게 맞는 정보를 찾기 어렵습니다.
+- **맞춤형 상담의 부재**: 기존의 커리어넷/워크넷 등은 정적인 정보만 제공하며, **개인의 성향을 고려한 심층적인 대화형 상담이 부족합니다**.
+- **비용 문제**: 사설 입시 컨설팅은 **고비용**으로 접근성이 낮습니다. 누구나 쉽게 접근 가능한 AI 멘토가 필요합니다.
+
+### 프로젝트 목표
+
+1. **정확성**: Pinecone 벡터 DB와 RAG를 통해 Hallucination을 최소화한 신뢰성 있는 정보 제공
+2. **개인화**: LangGraph 기반의 ReAct 에이전트를 통해 사용자의 의도를 파악하고 다단계 추론을 통한 맞춤 답변 제공
+3. **편의성**: 직관적인 채팅 인터페이스와 사용자 친화적인 온보딩 프로세스 구축
+
+---
+
+## 4. 프로젝트 구조
 
 ```
-major-mentor-bot/
-├─ backend/
-│  ├─ data/
-│  │  ├─ raw/
-│  │  │  └─ *.json                        # 원본 JSON
-│  │  └─ processed/
-│  │     └─ courses.parquet               # 전처리/캐시(optional)
-│  ├─ graph/
-│  │  ├─ __init__.py
-│  │  ├─ nodes.py                         # LangGraph 노드 정의
-│  │  ├─ state.py                         # State 모델 정의
-│  │  └─ graph_builder.py                 # Graph 생성 함수
-│  ├─ rag/
-│  │  ├─ loader.py                        # JSON → Document 로딩
-│  │  ├─ embeddings.py                    # 임베딩 설정
-│  │  ├─ vectorstore.py                   # 벡터DB 초기화/저장/로딩
-│  │  └─ retriever.py                     # Retriever 래퍼
-│  ├─ api/
-│  │  └─ __init__.py
-│  ├─ config.py                           # 경로, 모델 이름, 설정값
-│  ├─ main.py                             # LangGraph 엔트리포인트
-│  └─ requirements.txt
+Unigo/
+├── backend/                             # AI 백엔드 (LangGraph + RAG)
+│   ├── data/                            # 초기 데이터 (Seeding)
+│   │   ├── major_detail.json            # 학과 상세 정보 (커리어넷)
+│   │   ├── major_categories.json        # 학과 대분류 데이터
+│   │   └── university_data_cleaned.json # 대학 기본 정보 (대학어디가)
+│   ├── db/                              # DB 관리 (SQLAlchemy)
+│   │   ├── connection.py                # DB 연결 설정
+│   │   ├── models.py                    # DB 테이블 모델 (Major, University 등)
+│   │   ├── seed_all.py                  # 전체 데이터 시딩 실행
+│   │   └── seed_*.py                    # 개별 테이블 시딩 스크립트
+│   ├── graph/                           # LangGraph 워크플로우
+│   │   ├── graph_builder.py             # 그래프 구조 및 엣지 연결
+│   │   ├── nodes.py                     # 노드별 로직 (Agent, Tools)
+│   │   ├── state.py                     # 그래프 상태(State) 정의
+│   │   └── helper.py                    # 그래프 유틸리티
+│   ├── rag/                             # RAG 시스템
+│   │   ├── tools.py                     # LangChain 도구 (검색, 조회)
+│   │   ├── retriever.py                 # Pinecone 검색 로직
+│   │   ├── embeddings.py                # 임베딩 생성 (OpenAI)
+│   │   ├── vectorstore.py               # Pinecone 클라이언트 및 인덱싱
+│   │   ├── loader.py                    # JSON 데이터 로딩 및 파싱
+│   │   └── build_major_index.py         # 벡터 인덱스 생성 스크립트
+│   ├── scripts/                         # 추가 유틸리티
+│   │   └── ingest_*.py                  # 데이터 인덱싱 스크립트
+│   ├── config.py                        # 환경 변수 및 설정 로드
+│   └── main.py                          # AI 서버 엔트리포인트
 │
-├─ frontend/
-│  ├─ app.py                              # Streamlit 메인 앱
-│  └─ requirements.txt
+├── unigo/                               # Django 웹 애플리케이션
+│   ├── unigo_app/                       # 메인 앱
+│   │   ├── views.py                     # API 및 뷰 로직 (채팅, 인증)
+│   │   ├── models.py                    # Django 모델 (Conversation, Message)
+│   │   ├── urls.py                      # URL 라우팅
+│   │   └── admin.py                     # 관리자 페이지 설정
+│   ├── unigo/                           # 프로젝트 설정
+│   │   ├── settings.py                  # Django 전역 설정
+│   │   ├── urls.py                      # 루트 URL 설정
+│   │   └── asgi.py/wsgi.py              # 서버 인터페이스
+│   ├── templates/                       # HTML 템플릿 파일
+│   │   └── unigo_app/
+│   │       ├── base.html                # 기본 레이아웃 (헤더, 푸터 포함)
+│   │       ├── auth.html                # 로그인/회원가입 페이지
+│   │       ├── chat.html                # 메인 채팅 인터페이스
+│   │       ├── character_select.html    # 캐릭터 선택 (온보딩)
+│   │       └── setting.html             # 사용자 설정 페이지
+│   ├── static/                          # 정적 자산
+│   │   ├── css/                         # 스타일시트
+│   │   │   ├── chat.css                 # 채팅 화면 스타일
+│   │   │   ├── setting.css              # 설정 페이지 스타일
+│   │   │   └── styles.css               # 공통 스타일
+│   │   ├── js/                          # 클라이언트 스크립트
+│   │   │   ├── chat.js                  # 채팅 로직 및 웹소켓 처리
+│   │   │   ├── setting.js               # 설정 변경 핸들링
+│   │   │   └── character_select.js      # 온보딩 인터랙션
+│   │   └── images/                      # 이미지 자산 (캐릭터, 아이콘)
+│   ├── media/                           # 사용자 업로드 파일
+│   └── manage.py                        # Django 관리 명령
 │
-├─ .env.example                           # API 키/환경변수 예시
-├─ README.md
-└─ pyproject.toml or environment.yml (선택)
+├── nginx/                               # Nginx 설정 파일
+├── docs/                                # 개발 문서 및 회고록
+├── docker-compose.yml                   # Docker 컨테이너 오케스트레이션
+├── Dockerfile                           # Docker 이미지 빌드 설정
+├── .env                                 # 환경 변수 (API Key, DB 접속 정보)
+└── requirements.txt                     # Python 패키지 의존성 목록
 ```
 
-## 프로젝트 작동 방식
+---
 
-이 프로젝트는 **두 가지 주요 워크플로우**를 지원합니다:
+## 5. 요구사항 명세서
 
-### 1. ReAct 패턴 (대화형 멘토링)
+<img width="1176" height="791" alt="Image" src="https://github.com/user-attachments/assets/f78a271f-b81e-422d-bdd2-706b0a70c1cb" />
+https://www.notion.so/2c40413479c480458e42ebb6e116eef1
 
-**LLM이 자율적으로 tool 호출 여부를 결정하는 에이전트 방식**
+---
 
-```
-[사용자 질문] → agent_node → should_continue
-                    ↑              ↓
-                    └── tools ←────┘
-                         ↓
-                      [답변]
-```
+## 6. 화면 정의서
 
-**작동 순서:**
+<img width="1171" height="697" alt="Image" src="https://github.com/user-attachments/assets/aa9b4107-e7db-4636-9e1d-0bf08622d1ee" />
+https://www.figma.com/design/EQooVBPUshPncXDORTfJhB/%EC%9C%A0%EB%8B%88%EA%B3%A0?node-id=0-1&p=f&t=aAT9BriN4yCgShcK-0
 
-1. 사용자가 질문 입력 (예: "인공지능 관련 과목 추천해줘")
-2. `agent_node`: LLM이 질문을 분석하고 정보가 필요한지 판단
-3. LLM이 적절한 tool (`list_departments`, `get_universities_by_department` 등) 호출 결정
-4. `should_continue`: tool_calls 감지 → tools 노드로 라우팅
-5. `tools` 노드: 선택된 툴 실행 (학과 검색, 대학 찾기 등)
-6. `agent_node`로 복귀: LLM이 툴 결과를 바탕으로 답변 생성
-7. `should_continue`: tool_calls 없음 → 종료
+---
 
-**핵심 파일:**
+## 7. WBS
 
-- `backend/rag/tools.py`: 학과 검색, 대학 조회, 진로 정보 조회 등의 툴 정의
-- `backend/graph/nodes.py`: `agent_node`, `should_continue`
-- `backend/graph/graph_builder.py`: `build_react_graph()`
+<img width="1726" height="854" alt="image" src="https://github.com/user-attachments/assets/a2aa6bb0-6be0-43e4-9c00-4f7ee46d44e9" />
+https://www.notion.so/1-Unigo-28b0413479c481999c87d8546598ca95
 
-### 2. Major Recommendation 패턴 (온보딩 추천)
+---
 
-**사용자의 온보딩 답변을 분석하여 전공을 추천하는 파이프라인**
+## 8. 주요 기능
 
-```
-[온보딩 답변] → recommend_majors_node → [추천 결과]
-```
+### 1) 🤖 RAG 기반 AI 멘토
 
-**작동 순서:**
+**ReAct(Reasoning + Acting) 패턴**을 적용한 AI 에이전트가 사용자의 질문을 분석하고 필요한 정보를 실시간으로 검색하여 답변합니다.
 
-1. 사용자의 온보딩 답변(관심사, 과목, 희망 연봉 등) 수집
-2. `recommend_majors_node`: 답변을 텍스트 프로필로 변환 및 임베딩
-3. Vector Store(Pinecone)에서 관련 전공 검색
-4. 가중치를 적용하여 전공 점수 계산 및 상위 전공 추천
+- **전공 탐색**: "인공지능 배우려면 무슨 과 가야 해?" -> 관련 학과 및 커리큘럼 소개
+- **대학 검색**: "컴퓨터공학과 있는 서울 대학 어디야?" -> 개설 대학 목록 및 위치 정보 제공
+- **진로 상담**: "기계공학과 나오면 취업 잘 돼?" -> 취업률, 평균 연봉, 주요 진출 분야(커리어넷 데이터 기준) 제공
+- **입시 정보**: 각 대학 입학처의 수시/정시 모집요강 바로가기 링크 제공
 
-**핵심 파일:**
+### 2) 🎓 맞춤형 전공 추천 (온보딩)
 
-- `backend/graph/nodes.py`: `recommend_majors_node`
-- `backend/graph/graph_builder.py`: `build_major_graph()`
+사용자와의 초기 인터뷰(7가지 질문)를 통해 성향을 분석하고 최적의 전공을 추천합니다.
 
-### 실행 방법
+- **분석 요소**: 선호 과목, 관심사, 활동 유형, 선호 환경, 가치관, 관심 주제, 학습 스타일
+- **알고리즘**: 사용자 프로필 벡터와 전공 특성 벡터 간의 다차원 유사도 분석 + 가중치 적용 점수 시스템
 
-**대화형 멘토링 (ReAct):**
+### 3) 🔑 사용자 경험 (UX)
 
-```python
-from backend.main import run_mentor
+- **회원가입/로그인**: 개인화된 대화 기록 및 추천 결과 저장
+- **채팅 히스토리**: 이전 상담 내용을 언제든지 다시 확인 가능
+- **마크다운 지원**: 가독성 높은 텍스트 및 클릭 가능한 링크 제공
+- **페르소나 캐릭터**: 친근한 캐릭터(토끼 등) 기반 인터페이스
 
-answer = run_mentor("컴퓨터공학과가 있는 대학 알려줘")
-```
+---
 
-**전공 추천 (Onboarding):**
+## 9. 기술 스택
 
-```python
-from backend.main import run_major_recommendation
+| 분류          | 기술                        | 비고                                                |
+| ------------- | --------------------------- | --------------------------------------------------- |
+| **Backend**   | Python 3.11+, Django 5.x    | 웹 프레임워크 및 API                                |
+| **Data**      | MySQL                       | 관계형 데이터베이스 (전공/대학 정보, 사용자 데이터) |
+| **AI / RAG**  | LangChain, LangGraph        | AI 에이전트 및 워크플로우 관리                      |
+| **LLM**       | OpenAI GPT-4o-mini          | 추론 및 자연어 생성                                 |
+| **Vector DB** | Pinecone                    | 고성능 벡터 검색                                    |
+| **Frontend**  | HTML5, CSS3, JS, Django 5.x | 반응형 웹 인터페이스                                |
 
-results = run_major_recommendation({
-    "interests": "코딩, 로봇",
-    "subjects": "수학, 과학"
-})
-```
+---
 
-## 구성 설명
+## 10. 시스템 아키텍처 & 기술적 전략 (System Architecture & Technical Strategy)
 
-- **backend**
-  - LangGraph + LangChain RAG 파이프라인 전체를 담당합니다.
-  - `config.py`는 모든 경로 및 모델 설정을 중앙에서 관리하며, `.env` 기반으로 LLM/임베딩을 선택합니다.
-  - `rag/loader.py`는 JSON 데이터를 LangChain `Document`로 변환하고, `rag/vectorstore.py`는 Vector 벡터스토어를 생성·로드합니다.
-  - `rag/tools.py`는 `@tool` 데코레이터로 LLM이 호출할 수 있는 tool을 정의합니다.
-  - `graph/` 폴더에는 RAG 파이프라인을 LangGraph로 정의한 노드, 상태, 그래프 빌더가 들어 있습니다.
+### 1) 시스템 개요 (System Overview)
 
-- **frontend**
-  - `frontend/app.py`는 Streamlit UI를 제공하며 `backend.main.run_mentor`를 직접 호출해 답변을 보여줍니다.
+이 시스템은 Nginx 리버스 프록시 뒤에서 Django가 웹 애플리케이션과 AI 백엔드 로직을 모두 처리하는 **모듈러 모놀리스(Modular Monolith)** 아키텍처를 따릅니다.
 
-- **데이터 소스**
-  - API에서 받아온 과목 정보를 JSON으로 저장 후 `RAW_JSON` 경로에 둡니다.
+```mermaid
+flowchart TD
+    %% 1. AWS 환경 (서버)
+    subgraph AWS ["AWS EC2 Server"]
+    %% 2. Docker 환경
+    subgraph Docker ["Docker Environment"]
+        direction TB
 
-### 전공 카테고리 데이터 관리
+        subgraph Frontend ["Frontend"]
+            Client["Client (Web)"]
+        end
 
-이 프로젝트는 `backend/rag/tools.py`에서 사용하는 전공 카테고리 정보(`MAIN_CATEGORIES`)를 `backend/data/major_detail.json`에서 동적으로 추출하여 사용합니다.
+        Nginx["Nginx (Proxy)"]
+        Gunicorn["Gunicorn (WSGI Server)"]
 
-1. **카테고리 추출 스크립트**: `backend/rag/extract_categories.py`
-   - `major_detail.json`을 분석하여 전공명과 관련 학과들을 매핑합니다.
-   - 실행 결과는 `backend/data/major_categories.json`에 저장됩니다.
+        subgraph Backend ["Django Backend"]
+            Django["Django Application (Unigo)"]
 
-2. **데이터 갱신 방법**:
-   - `major_detail.json` 데이터가 변경되면 아래 명령어로 카테고리 정보를 갱신해야 합니다.
+            %% Django 내부 로직들
+            UnigoApp["unigo_app (Chat/Auth)"]
+            AIBackend["backend (LangGraph)"]
+            MySQL[("MySQL Database")]
+        end
 
-   ```bash
-   python backend/rag/extract_categories.py
-   ```
 
-3. **동적 로딩**:
-   - `backend/rag/tools.py`는 실행 시 `major_categories.json`을 로드하여 최신 카테고리 정보를 반영합니다.
+    end
+    end
 
-## 데이터 아키텍처 및 메타데이터 구조
+    %% 3. 외부 클라우드/API 서비스
+    subgraph CloudServices ["External Cloud Services"]
+        Pinecone[("Pinecone Vector DB")]
+        OpenAI["OpenAI API"]
+    end
 
-이 프로젝트는 **2단계 데이터 저장 전략**을 사용하여 효율적인 검색과 상세 정보 조회를 동시에 지원합니다.
 
-### 메타데이터 구조
+    %% 연결 관계 정의
+    Client -->|HTTP| Nginx
+    Nginx -->|Proxy Pass| Gunicorn
+    Gunicorn --> Django
 
-전공 정보는 `MajorDoc` 클래스를 통해 Pinecone 벡터 데이터베이스에 저장되며, 다음과 같은 메타데이터를 포함합니다:
+    %% Backend 내부 흐름
+    Django -->|View Logic| UnigoApp
+    Django -->|AI Logic call| AIBackend
+    Django -->|ORM| MySQL
 
-```python
-@dataclass
-class MajorDoc:
-    doc_id: str                    # 문서 고유 ID (예: "컴퓨터공학:summary")
-    major_id: str                  # 전공 고유 ID
-    major_name: str                # 전공명
-    doc_type: str                  # 문서 타입 (summary, interest, property, subjects, jobs)
-    text: str                      # 임베딩할 텍스트 내용
-    cluster: Optional[str]         # 전공 클러스터 분류
-    salary: Optional[float]        # 평균 급여 정보
-    relate_subject_tags: list[str] # 관련 과목 태그 리스트
-    job_tags: list[str]            # 진출 직업 태그 리스트
-    raw_subjects: Optional[str]    # 원본 과목 정보
-    raw_jobs: Optional[str]        # 원본 직업 정보
+    %% AI 로직의 외부 통신
+    AIBackend -->|Vector Search| Pinecone
+    AIBackend -->|LLM API| OpenAI
+
+    %% 스타일링
+    classDef docker fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef backend fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+
+    class Docker docker;
+    class Backend backend;
 ```
 
-### 문서 타입 (doc_type) 분류 상세
+### 2) 아키텍처 분석: Hybrid Approach (Django + SQLAlchemy)
 
-각 전공은 사용자의 다양한 질문 의도에 대응하기 위해 5가지 유형의 문서로 세분화되어 Pinecone에 저장됩니다.
+이 프로젝트는 일반적인 웹 애플리케이션 프레임워크인 **Django**와 파이썬 데이터 생태계의 표준 ORM인 **SQLAlchemy**를 동시에 사용하는 하이브리드 구조를 채택하고 있습니다.
 
-| 문서 유형 (`doc_type`) | 내용 (`text`) | 출처 필드 (JSON) | 검색 활용 예시 |
-| :--- | :--- | :--- | :--- |
-| **summary** | 학과 개요 및 요약 설명 | `summary` | "컴퓨터공학과가 뭐야?", "경영학과 소개" |
-| **interest** | 학과에 대한 흥미, 적성, 추천 활동 | `interest`, `career_act` | "나한테 맞는 전공일까?", "어떤 활동을 하면 좋아?" |
-| **property** | 학과의 특성, 배우는 내용의 성격 | `property` | "이 학과의 특징은?", "무엇을 중점적으로 배워?" |
-| **subjects** | 배우는 주요 과목, 관련 교과목 | `relate_subject` | "자료구조 배워?", "수학 많이 써?" |
-| **jobs** | 졸업 후 진출 분야, 관련 직업 | `job`, `enter_field` | "졸업하면 뭐 해?", "취업 잘 돼?" |
+- **Django**: 웹 서비스의 '뼈대'를 담당
+  - **역할**: 사용자 인증(Auth), 관리자 페이지(Admin), 정적 파일 관리, 엔드포인트 라우팅(Views).
+  - **특징**: 생산성이 높고 보안 기능이 내장되어 있어 웹 서비스 구축에 효율적입니다.
+- **SQLAlchemy**: AI/데이터 서비스의 '심장'을 담당
+  - **역할**: RAG(검색 증강 생성)를 위한 벡터 메타데이터 관리, 대용량 데이터(전공, 대학 정보) 적재 및 조회, LangChain 등 AI 라이브러리와의 연동.
+  - **위치**: `backend/db`, `backend/rag`, `backend/main.py` 등 AI 로직이 집중된 모듈에서 주로 사용됨.
 
-**저장 예시 (컴퓨터공학과):**
+### 3) SQLAlchemy를 사용이유
 
-1. `컴퓨터공학과:summary`: "컴퓨터공학과는 컴퓨터 시스템, 소프트웨어..."
-2. `컴퓨터공학과:interest`: "평소 컴퓨터 조립이나 프로그램 만드는 것에 흥미가..."
-3. `컴퓨터공학과:property`: "정보화 사회를 선도하는 첨단 기술을..."
-4. `컴퓨터공학과:subjects`: "자료구조, 운영체제, 알고리즘, 데이터베이스..."
-5. `컴퓨터공학과:jobs`: "시스템소프트웨어개발자, 응용소프트웨어개발자, 네트워크엔지니어..."
+단순히 Django ORM만으로도 데이터베이스 조작이 가능함에도 불구하고, SQLAlchemy를 별도로 도입한 데에는 다음과 같은 강력한 기술적 이유가 존재합니다.
 
-### 데이터 흐름 구조
+1.  **AI/Data 생태계와의 호환성 (Ecosystem Compatibility)**
 
-```
-major_detail.json (원본 데이터)
-        ↓
-load_major_detail() [backend/rag/loader.py]
-        ↓
-MajorRecord 객체 생성 (raw 필드에 전체 데이터 보관)
-        ↓
-┌───────────────────┬────────────────────┐
-│                   │                    │
-Pinecone 업로드      메모리 캐시           직접 조회
-(메타데이터만)       (_MAJOR_RECORDS_CACHE)  (tools.py)
-```
+    - LangChain 및 대부분의 최신 AI 라이브러리(LlamaIndex 등)는 RAG 파이프라인 구축 시 **SQLAlchemy를 사실상의 표준(De-facto Standard)**으로 지원합니다.
+    - Django ORM은 프레임워크에 강하게 결합되어 있어 독립적인 AI 모듈에서 사용하기 무겁고 설정이 복잡한 반면, SQLAlchemy는 가볍고 독립적으로 동작하여 AI 모듈과의 결합이 자연스럽습니다.
 
-### 2단계 데이터 저장 전략
+2.  **성능 및 미세 제어 (Performance & Fine-grained Control)**
 
-#### 1단계: Pinecone 벡터 데이터베이스 (검색용)
+    - **Bulk Operation**: `seed_all.py` 등 대용량 데이터 적재 시, SQLAlchemy Core를 사용하여 Raw SQL 수준의 성능을 내면서도 파이썬 객체로 관리할 수 있습니다.
+    - **Connection Pooling**: AI 모델 서빙과 같이 리소스 관리가 중요한 환경에서 `pool_pre_ping=True`, `pool_recycle=3600` 등 상세한 커넥션 풀 설정을 통해 DB 연결 안정성을 확보했습니다.
 
-**저장 데이터:**
-- 메타데이터: `doc_id`, `major_id`, `major_name`, `doc_type`, `cluster`, `salary`, `relate_subject_tags`, `job_tags`
-- 임베딩 벡터: `text` 필드를 임베딩한 벡터
+3.  **복잡한 데이터 타입 처리**: `Major` 모델의 `LONGTEXT` 컬럼에 JSON 데이터를 저장하는 등 비정규화된 패턴이나 커스텀 타입을 매핑할 때 훨씬 유연한 기능을 제공합니다.
 
-**용도:**
-- 의미 기반 유사도 검색
-- 빠른 전공 필터링 및 매칭
+### 4) 상세 분석: Django와 SQLAlchemy의 공존 (Co-existence Strategy)
 
-**예시:**
-```python
-# "AI 관련 전공 찾기"와 같은 의미 기반 검색
-results = vectorstore.similarity_search("인공지능 관련 전공")
-```
+시스템은 **"Django가 문지기(Gatekeeper) 역할을 하고, SQLAlchemy가 두뇌(Brain) 역할을 하는 구조"**입니다.
 
-#### 2단계: 메모리 캐시 (상세 정보용)
+1.  **진입 (Entry)**: 사용자 프론트엔드가 Django 웹 서버(`unigo_app/views.py`)로 HTTP 요청을 보냅니다.
+2.  **보안 및 인증 (Security)**: Django가 세션 인증, 권한 검사 등을 수행합니다. (Django ORM 사용)
+3.  **위임 (Delegation)**: 유효한 요청이라면 Django View가 `backend.main.run_mentor()`를 호출하여 제어권을 AI 로직으로 넘깁니다.
+4.  **AI 추론 (Inference)**: `run_mentor`는 LangGraph를 실행하며, 이 과정에서 필요한 데이터 조회는 SQLAlchemy를 통해 `Major`/`University` 테이블 및 Vector Store에 접근합니다.
+5.  **응답 (Response)**: AI가 생성한 최종 답변 텍스트만 Django View로 반환되어 클라이언트에게 전달됩니다.
 
-**저장 데이터:**
-- 전체 `MajorRecord` 객체 (모든 원본 데이터 포함)
-- `raw` 필드에 `major_detail.json`의 원본 JSON 데이터 전체 보관
+### 5) AI 도구 & 워크플로우 (AI Tools & Workflow)
 
-**용도:**
-- 상세 정보 조회 (대학 목록, 자격증, 주요 과목 등)
-- Pinecone에 저장되지 않은 추가 정보 제공
+AI 멘토는 **LangGraph**를 사용하여 상태 기반의 워크플로우를 관리하며, `backend/rag/tools.py`에 정의된 도구들을 사용하여 답변을 생성합니다.
 
-**캐싱 메커니즘:**
-```python
-# backend/rag/tools.py
-_MAJOR_RECORDS_CACHE = None  # 전체 MajorRecord 리스트
-_MAJOR_ID_MAP = {}           # major_id로 빠른 조회
-_MAJOR_NAME_MAP = {}         # 전공명으로 빠른 조회
-_MAJOR_ALIAS_MAP = {}        # 별칭으로 빠른 조회
-
-def _ensure_major_records():
-    """첫 호출 시 major_detail.json을 로드하여 메모리에 캐싱"""
-    global _MAJOR_RECORDS_CACHE
-    if _MAJOR_RECORDS_CACHE is not None:
-        return
-    
-    records = load_major_detail()  # 전체 원본 데이터 로드
-    _MAJOR_RECORDS_CACHE = records
-    # 인덱스 생성...
+```mermaid
+flowchart TD
+    Start(["Start"]) --> Agent["Agent Node<br/>(LLM Reasoning)"]
+    Agent --> Check{"Tool Needed?"}
+    Check -->|Yes| Tools["Tools Node<br/>(Execution)"]
+    Check -->|No| Answer["Generate Answer"]
+    Tools --> Agent
+    Answer --> End(["End"])
+    style Agent fill:#f9f,stroke:#333,stroke-width:2px
+    style Tools fill:#bbf,stroke:#333,stroke-width:2px
 ```
 
-### 실제 사용 흐름
+### 6) 데이터베이스 클러스터 & 스키마 (Database Clusters & Schema)
 
-```python
-# 1단계: Pinecone으로 관련 전공 검색 (벡터 유사도)
-results = vectorstore.similarity_search("AI 관련 전공")
+데이터베이스는 크게 **세 가지 논리적 영역(Cluster)**으로 나뉘어 관리되고 있습니다.
 
-# 2단계: 검색된 전공의 major_id로 상세 정보 조회
-record = _MAJOR_ID_MAP[major_id]
+1.  **User & Chat Cluster (Django)**: 사용자, 대화 기록, 프로필 관리 (웹 서비스 영역)
+2.  **AI Data Cluster (SQLAlchemy)**: RAG/검색 엔진이 사용하는 전공 및 대학 원본 데이터 (AI 영역 - 핵심 데이터)
+3.  **App Data Cluster (Django)**: Django Admin용으로 정의되었으나 AI 로직과는 분리된 영역
 
-# 3단계: 원본 데이터의 모든 필드 활용
-university_list = record.university      # Pinecone에 없는 정보
-chart_data = record.chart_data          # Pinecone에 없는 정보
-employment_rate = record.employment     # Pinecone에 없는 정보
-raw_json = record.raw                   # 전체 원본 JSON
+**주요 테이블 관계도**
+
+| 모델명 (Model)          | 관리 주체  | 설명 (Description)           | 주요 필드                                                                          |
+| :---------------------- | :--------- | :--------------------------- | :--------------------------------------------------------------------------------- |
+| **MajorCategory**       | SQLAlchemy | 전공 상세 정보 (커리어넷)    | `id`, `category_name`, `subject_name`                                              |
+| **Major**               | SQLAlchemy | 전공 상세 정보 (커리어넷)    | `id`, `major_name`, `relate_subject`, `university`, `chat_data`, `employment_rate` |
+| **University**          | SQLAlchemy | 대학 메타데이터 (대학어디가) | `id`, `name`, `code`                                                               |
+| **MajorRecommendation** | SQLAlchemy | 전공-대학 매핑 (Mapping)     | `id`, `user_id`, `onboarding_answers`, `recommended_majors`                        |
+| **Conversation**        | Django     | 채팅 세션 정보               | `id`, `user_id`, `session_id`, `title`                                             |
+| **Message**             | Django     | 채팅 메시지 내역             | `id`, `conversation_id`, `role`, `content`, `metadata`                             |
+| **UserProfile**         | Django     | 사용자 프로필 정보           | `id`, `user_id`, `character`, `custom_image`                                       |
+
+> **주의사항**: 두 개의 ORM이 하나의 DB를 공유하므로, 마이그레이션 시 주의가 필요합니다. `User/Chat` 영역은 Django `migrate`로, `AI Data` 영역은 `init_db.py` 등 별도 스크립트로 관리하여 두 영역의 충돌을 방지합니다.
+
+#### 벡터 데이터베이스 (Pinecone)
+
+- **`major_categories`**: 광범위한 매칭을 위한 표준 전공명 및 카테고리 임베딩.
+- **`university_majors`**: 세밀한 의미 기반 검색을 위한 "대학명 + 학과명" 쌍의 임베딩.
+
+#### ERD
+
+```mermaid
+erDiagram
+    %% ==========================================
+    %% 1. User & Chat Cluster (Django Native)
+    %% ==========================================
+    USER ||--|| USER_PROFILE : "has"
+    USER ||--o{ CONVERSATION : "owns"
+    USER ||--o{ MAJOR_RECOMMENDATION : "receives"
+    CONVERSATION ||--o{ MESSAGE : "contains"
+
+    USER {
+        int id PK
+        string username
+        string email
+        string password
+    }
+
+    USER_PROFILE {
+        int id PK
+        int user_id FK
+        string character "페르소나 (rabbit 등)"
+        string custom_image
+    }
+
+    CONVERSATION {
+        int id PK
+        int user_id FK "Nullable (비로그인 지원)"
+        string session_id "Guest 식별용"
+        string title
+    }
+
+    MESSAGE {
+        int id PK
+        int conversation_id FK
+        string role "user/assistant"
+        text content
+        json metadata
+    }
+
+    MAJOR_RECOMMENDATION {
+        int id PK
+        int user_id FK
+        json onboarding_answers
+        json recommended_majors
+    }
+
+    %% ==========================================
+    %% 2. AI Data Cluster (SQLAlchemy Managed)
+    %% ** 실질적인 AI 데이터가 저장되는 곳 **
+    %% ==========================================
+    MAJOR_CATEGORY |{--|| MAJOR : "groups (JSON list)"
+
+    MAJOR {
+        int id PK
+        string major_name "전공명"
+        json relate_subject
+        json university
+        json chart_data
+        float employment_rate
+    }
+
+    MAJOR_CATEGORY {
+        int id PK
+        string category_name
+        json major_names
+    }
+
+    UNIVERSITY {
+        int id PK
+        string name
+        string code
+    }
 ```
 
-### 메타데이터 활용 예시
+---
 
-#### 필터링 및 정렬
-```python
-# 급여 정보를 기반으로 필터링
-high_salary_majors = [doc for doc in docs if doc.salary and doc.salary > 4000]
+## 11. 배포 과정 (Deployment)
 
-# 클러스터별 그룹화
-engineering_majors = [doc for doc in docs if doc.cluster == "공학계열"]
-```
+### 배포 환경
 
-#### 태그 기반 매칭
-```python
-# 사용자가 선택한 과목과 매칭
-user_subjects = ["수학", "물리"]
-matched = [doc for doc in docs 
-           if any(subj in doc.relate_subject_tags for subj in user_subjects)]
-```
+- **Cloud Platform**: AWS EC2 / Azure VM
+- **Web Server**: Nginx (Reverse Proxy)
+- **WAS**: Gunicorn
+- **Database**: MySQL, Pinecone (Serverless)
 
-### 왜 이렇게 설계했을까?
+### 배포 파이프라인
 
-| 구분 | Pinecone (벡터 DB) | 메모리 캐시 (MajorRecord) |
-|------|-------------------|------------------------|
-| **용도** | 의미 기반 검색 | 상세 정보 조회 |
-| **저장 데이터** | 메타데이터 + 임베딩 | **전체 원본 데이터** |
-| **장점** | 빠른 유사도 검색 | 모든 필드 접근 가능 |
-| **예시** | "AI 관련 전공 찾기" | "컴퓨터공학과의 자격증 목록" |
-| **크기** | 가볍고 효율적 | 전체 데이터 보관 |
+1. **Source Control**: GitHub를 통한 코드 형상 관리
+2. **Build**: `requirements.txt` 의존성 설치 및 정적 파일(`collectstatic`) 빌드
+3. **Run**: Gunicorn을 사용하여 Django 애플리케이션 실행, Nginx가 80포트로 들어오는 요청을 Gunicorn 소켓으로 포워딩
 
-### 관련 파일
+---
 
-- **`backend/rag/loader.py`**: `MajorRecord`, `MajorDoc` 클래스 정의 및 데이터 로딩
-- **`backend/rag/tools.py`**: 메모리 캐시 관리 및 상세 정보 조회 툴
-- **`backend/rag/vectorstore.py`**: Pinecone 벡터 데이터베이스 관리
-- **`backend/data/major_detail.json`**: 원본 전공 데이터
+## 12. 트러블 슈팅 (Troubleshooting)
 
-## LLM/Embedding 모델 변경 방법
+<img width="1326" height="892" alt="Image" src="https://github.com/user-attachments/assets/cee685b0-50a0-4c9e-b9ad-db290668858e" />
+https://www.notion.so/2cb0413479c4800aae5ae66665d29c51
 
-이 프로젝트는 **LLM 모델**과 **Embedding 모델**을 각각 독립적으로 설정할 수 있습니다.
+---
 
-### 중요: 모델 변경 시 주의사항
+## 13. 테스트 계획 및 결과
 
-⚠️ **Embedding 모델을 변경하면 반드시 벡터스토어를 재생성해야 합니다!**
+<img width="534" height="794" alt="image" src="https://github.com/user-attachments/assets/fe50a3b7-bb35-4ba2-816c-057a6146fd7a" />
+<img width="548" height="636" alt="image" src="https://github.com/user-attachments/assets/4d83adc0-165e-4ad1-8caa-a80570748f6d" />
+<img width="532" height="188" alt="image" src="https://github.com/user-attachments/assets/523720cf-aa36-4495-8d43-b48afd856bff" />
 
-```bash
-# Embedding 모델 변경 후 필수 실행
-python -m backend.rag.vectorstore
-```
 
-벡터스토어는 기존 embedding 모델로 생성된 벡터를 저장하고 있으므로, 다른 embedding 모델로 변경하면 차원(dimension)이나 벡터 공간이 달라져 검색이 제대로 작동하지 않습니다.
+| [Notion](https://www.notion.so/2cc0413479c480fab4b0f122297a40ea)
 
-### 1. OpenAI 모델 사용
+---
 
-#### .env 설정
+## 14. 수행결과 (시연)
 
-```bash
-# API Key 설정
-OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxx
+### 1) 로그인 및 회원가입
 
-# LLM 설정
-LLM_PROVIDER=openai
-MODEL_NAME=gpt-4o                    # 또는 gpt-4o-mini, gpt-4-turbo 등
+- 이메일/닉네임 중복 체크 및 보안 로그인
 
-# Embedding 설정
-EMBEDDING_PROVIDER=openai
-EMBEDDING_MODEL_NAME=text-embedding-3-large  # 또는 text-embedding-3-small
-```
+### 2) 온보딩 (성향 분석)
 
-#### 사용 가능한 모델
+- **시나리오**: '추천 시작' 키워드로 시작 -> 7가지 성향 질문 응답 -> 가중치 기반 Top 5 학과 추천
+- **결과**: 사용자의 관심사(예: "분석하는 일, 수학, 헬스")를 반영한 학과 추천 제공
 
-- **LLM**: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `gpt-3.5-turbo`
-- **Embedding**: `text-embedding-3-large`, `text-embedding-3-small`, `text-embedding-ada-002`
+### 3) 메인 채팅 & Tool Calling
 
-#### 필요한 패키지 (이미 설치됨)
+- **시나리오 1 (학과 검색)**: "인공지능 관련된 학과들 다 알려줘" -> `list_departments` 호출
+- **시나리오 2 (대학 검색)**: "연세대 컴퓨터 공학과 있어?" -> `get_universities_by_department` 호출
+- **시나리오 3 (진로 정보)**: "컴퓨터공학과 졸업하면 연봉 어때?" -> `get_major_career_info` 호출
+- **시나리오 4 (입시 정보)**: "서울대학교 입시 정보 알려줘." -> `get_university_admission_info` 호출
+- **시나리오 5 (검색 도움)**: "사용법좀 알려줘." (잡담/검색 실패) -> `get_search_help` 호출
 
-```bash
-pip install langchain-openai openai
-```
+### 4) 설정 및 개인화
 
-### 2. HuggingFace 모델 사용 (기본값)
+- 캐릭터 선택(토끼, 거북이 등) 및 커스텀 이미지 업로드
+- "내 관심사 기억해?" -> 저장된 온보딩 정보 기반 답변 확인
 
-#### .env 설정
+---
 
-```bash
-# API Token 설정 (선택, 없어도 public 모델 사용 가능)
-HUGGINGFACEHUB_API_TOKEN=hf_xxxxxxxxxxxxx
+## 15. 한 줄 회고
 
-# LLM 설정
-LLM_PROVIDER=huggingface
-MODEL_NAME=Qwen/Qwen2.5-7B-Instruct   # HuggingFace 모델 repo ID
-
-# Embedding 설정
-EMBEDDING_PROVIDER=huggingface
-EMBEDDING_MODEL_NAME=upskyy/bge-m3-korean   # 한국어 임베딩 모델
-```
-
-#### 추천 모델 조합
-
-**⚠️ 중요: 반드시 `-Instruct`, `-Chat`, `-it` 등 instruction-tuned 모델을 사용하세요!**
-
-이 프로젝트는 tool binding을 사용하므로 chat/conversational API를 지원하는 모델이 필요합니다.
-
-**한국어 특화 (권장):**
-
-```bash
-MODEL_NAME=Qwen/Qwen2.5-7B-Instruct           # ✅ 한국어 성능 우수, Chat 지원, Inference API 활성화
-EMBEDDING_MODEL_NAME=upskyy/bge-m3-korean     # 한국어 임베딩
-
-# 또는 (더 경량)
-MODEL_NAME=Qwen/Qwen2.5-3B-Instruct           # ✅ 빠른 응답, Inference API 활성화
-```
-
-**영어/다국어:**
-
-```bash
-MODEL_NAME=meta-llama/Llama-3.2-3B-Instruct   # ✅ Chat 지원
-EMBEDDING_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2
-```
-
-**경량 모델 (빠른 응답):**
-
-```bash
-MODEL_NAME=google/gemma-2-2b-it                # ✅ Chat 지원 (it = instruction-tuned)
-EMBEDDING_MODEL_NAME=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-```
-
-**❌ 사용 불가능한 모델 예시:**
-
-```bash
-# 다음 모델들은 Chat API를 지원하지 않아 에러 발생
-MODEL_NAME=upstage/SOLAR-10.7B-Instruct-v1.0  # ❌ text-generation only
-MODEL_NAME=meta-llama/Llama-2-7b-hf           # ❌ base model
-MODEL_NAME=EleutherAI/gpt-j-6B                # ❌ base model
-```
-
-#### 필요한 패키지 (이미 설치됨)
-
-```bash
-pip install langchain-huggingface huggingface_hub sentence-transformers
-```
-
-### 3. vLLM 서버 사용 (Inference API 미배포 모델 지원)
-
-**Inference API가 배포되지 않은 모델**(예: `skt/A.X-4.0-Light`, `upstage/SOLAR-10.7B-Instruct-v1.0`)을 사용하려면 vLLM 서버로 로컬에서 모델을 직접 실행할 수 있습니다.
-
-#### 사전 준비
-
-1. vLLM 설치:
-
-```bash
-pip install vllm
-```
-
-2. vLLM 서버 시작 (별도 터미널):
-
-```bash
-# Linux/macOS
-vllm serve skt/A.X-4.0-Light \
-    --host 0.0.0.0 \
-    --port 8000 \
-    --dtype auto \
-    --api-key token-abc123
-
-# Windows
-python -m vllm.entrypoints.openai.api_server ^
-    --model skt/A.X-4.0-Light ^
-    --host 0.0.0.0 ^
-    --port 8000 ^
-    --dtype auto ^
-    --api-key token-abc123
-```
-
-#### .env 설정
-
-vLLM은 OpenAI 호환 API를 제공하므로 `openai` provider를 사용합니다:
-
-```bash
-# LLM 설정
-LLM_PROVIDER=openai
-MODEL_NAME=skt/A.X-4.0-Light              # vLLM에서 실행 중인 모델명
-OPENAI_API_KEY=token-abc123               # vLLM 서버 시작 시 설정한 키
-OPENAI_API_BASE=http://localhost:8000/v1  # vLLM 서버 주소
-
-# Embedding 설정 (vLLM은 embedding 미지원, HuggingFace 사용)
-EMBEDDING_PROVIDER=huggingface
-EMBEDDING_MODEL_NAME=upskyy/bge-m3-korean
-```
-
-#### 장점
-
-- ✅ Inference API 미배포 모델 사용 가능 (`skt/A.X-4.0-Light` 등)
-- ✅ Chat, Tool calling 완벽 지원
-- ✅ GPU 사용으로 빠른 추론
-- ✅ API 비용 없음 (로컬 실행)
-
-#### 단점
-
-- ❌ GPU 메모리 필요 (A.X-4.0-Light: 약 8-10GB VRAM)
-- ❌ 별도 서버 프로세스 실행 필요
-
-#### 필요한 패키지
-
-```bash
-pip install vllm  # vLLM 서버용
-# langchain-openai는 이미 설치됨
-```
-
-### 4. Ollama 로컬 모델 사용
-
-Ollama를 사용하면 로컬에서 모델을 실행할 수 있어 API 비용이 들지 않습니다.
-
-#### 사전 준비
-
-1. [Ollama 설치](https://ollama.ai/download)
-2. 모델 다운로드:
-
-```bash
-ollama pull llama3.2:3b
-ollama pull qwen2.5:7b-instruct
-```
-
-#### .env 설정
-
-```bash
-# LLM 설정
-LLM_PROVIDER=ollama
-MODEL_NAME=qwen2.5:7b-instruct        # Ollama 모델명
-
-# Embedding 설정 (Ollama는 embedding 미지원, HuggingFace 사용)
-EMBEDDING_PROVIDER=huggingface
-EMBEDDING_MODEL_NAME=upskyy/bge-m3-korean
-```
-
-#### 사용 가능한 모델
-
-- `llama3.2:1b`, `llama3.2:3b` (경량)
-- `qwen2.5:7b-instruct` (한국어 우수)
-- `gemma2:2b`, `gemma2:9b`
-
-#### 필요한 패키지 (이미 설치됨)
-
-```bash
-pip install langchain-community
-```
-
-### 4. 모델 변경 체크리스트
-
-#### LLM 모델만 변경하는 경우
-
-- [x] `.env`에서 `LLM_PROVIDER` 설정
-- [x] `.env`에서 `MODEL_NAME` 설정
-- [x] 필요시 API 키 설정
-- [x] 애플리케이션 재시작: `streamlit run frontend/app.py`
-
-#### Embedding 모델을 변경하는 경우
-
-- [x] `.env`에서 `EMBEDDING_PROVIDER` 설정
-- [x] `.env`에서 `EMBEDDING_MODEL_NAME` 설정
-- [x] 필요시 API 키 설정
-- [x] **⚠️ 벡터스토어 재생성 (필수!):** `python -m backend.rag.vectorstore`
-- [x] 애플리케이션 재시작: `streamlit run frontend/app.py`
-
-### 5. 일반적인 에러 및 해결 방법
-
-#### 에러: "Unsupported LLM_PROVIDER"
-
-```
-ValueError: Unsupported LLM_PROVIDER: gpt-4. Use one of ['openai', 'ollama', 'huggingface'].
-```
-
-**원인:** `LLM_PROVIDER`에 모델명을 입력함
-**해결:** `LLM_PROVIDER`는 `openai`, `ollama`, `huggingface` 중 하나만 가능
-
-```bash
-# 잘못된 예
-LLM_PROVIDER=gpt-4
-
-# 올바른 예
-LLM_PROVIDER=openai
-MODEL_NAME=gpt-4o
-```
-
-#### 에러: "No API key found"
-
-```
-openai.AuthenticationError: No API key found for OpenAI
-```
-
-**해결:** `.env` 파일에 API 키 추가
-
-```bash
-OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxx
-```
-
-#### 에러: "Model not found" (HuggingFace)
-
-```
-HfHubHTTPError: 404 Client Error: Repository Not Found
-```
-
-**원인:** 모델명이 잘못되었거나 private 모델
-**해결:**
-
-1. [HuggingFace Hub](https://huggingface.co/models)에서 정확한 모델명 확인
-2. Private 모델이면 `HUGGINGFACEHUB_API_TOKEN` 설정
-
-#### 에러: "Connection refused" (Ollama)
-
-```
-ConnectionError: [Errno 111] Connection refused
-```
-
-**원인:** Ollama 서버가 실행 중이지 않음
-**해결:**
-
-```bash
-# Ollama 서버 시작
-ollama serve
-```
-
-## 참고/아이디어 메모
-
-- 챗봇이 제공할 수 있는 기능
-  - 커리큘럼 비교, 특정 과목 설명, 학기별 개설 여부 안내.
-  - 능력/학년별 추천 과목, 특정 학교/학과에서 경험할 학업 로드맵 요약.
-  - 불필요한 질문 필터링, 사용 가이드(프롬프팅 팁) 제공.
-
-- RAG 품질 점검
-  - 다양한 학교·학과 조합에 대한 검색 결과 확인.
-  - 과목 설명, 비교 분석, 특색 있는 강의 정보 등을 충분히 포함하는지 검증.
+- **강지완**: "지난 3차 프로젝트의 한계점이 명확해서 이에 대한 개선점에 집중한 프로젝트였습니다. 특히, 데이터 관련 한계가 있습니다. 단순 크롤링 스니펫만을 활용하여 데이터를 수집하는 과정은 자동화도 힘들고 현재 존재하는 모든 대학에 대한 정보를 얻는것이 거의 불가능하다고 생각했습니다. 커리어넷 API, Adiga 입시 정보 사이트를 활용하여 파편화된 대학 관련 정보를 하나의 도메인으로 통합하는 것을 목표로 잡았습니다. 결과적으로 의도한 100%의 목표를 이루었다고는 할 수 없지만, 어느정도 괜찮은 정보를 제공할 수 있게 되었습니다. Docker, AWS를 활용한 배포가 처음이었는데 배포 하는 과정에서 linux 서버에 대한 이해도를 높일 수 있었습니다."
+- **김진**: "이번 프로젝트를 진행하며 단순한 정보 나열이 아닌 사용자의 질문 의도와 흐름을 고려한 응답 구조의 중요성을 느꼈다. 커리어넷 및 전국 대학 학과 데이터를 새로 수집하여 전체 학과 정보를 제공함으로써 정보 제공의 신뢰도를 높였다. 또한 툴 호출 결과를 프롬프트로 재구성하고 요약 기능을 적용함으로써 정보 과다로 인한 혼란을 줄이고 사용자 중심의 대화 경험을 구현했다. 이 과정을 통해 기술 구현뿐만 아니라 사용자 경험을 중심으로 사고하려는 태도를 기를 수 있었다."
+- **마한성**: "데이터 정형화의 어려움을 겪으며 '신뢰할 수 있는 데이터 파이프라인'의 중요성을 체감했습니다. 이를 해결하는 과정에서 백엔드를 넘어 프론트엔드(HTML/JS)까지 직접 구현하고, 팀 전체의 아키텍처를 분석하며 서비스의 전체 구조를 다루는 경험을 했습니다."
+- **오하원**: "3차에서 안 됐거나 피드백 받은 부분들, 프론트를 react로 다 만들었으나 다시 django로 새로 만들었던 점, 3차 때 크롤링했던 모든 데이터들을 새로운 오픈데이터셋(API)으로 바뀐 점, 원래는 고려하지 않았지만 프로젝트 진행하며 새롭게 추가시킨 점 등, 많은 내용들이 오고갔음에도 팀원 모두 프로젝트 진행상황을 인지하며 협업했던 점에서 좋은 경험을 쌓았다 생각합니다."

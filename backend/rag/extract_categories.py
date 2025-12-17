@@ -1,14 +1,27 @@
 import json
-import re
+from pathlib import Path
 
 def load_majors():
     """
     major_detail.json 파일에서 전공 및 학과 정보를 추출하여
     major_categories.json 파일로 저장하는 스크립트입니다.
     """
+    # 경로 설정 (상대 경로로 변경)
+    current_file = Path(__file__).resolve()
+    # backend/rag/extract_categories.py -> parents[2] is Project Root
+    project_root = current_file.parents[2]
+    data_dir = project_root / 'backend' / 'data'
+    
+    input_path = data_dir / 'major_detail.json'
+    output_path = data_dir / 'major_categories.json'
+
+    if not input_path.exists():
+        print(f"Error: Input file not found at {input_path}")
+        return
+
     try:
         # 원본 데이터 파일 로드
-        with open('/home/maroco/major_mentor/backend/data/major_detail.json', 'r', encoding='utf-8') as f:
+        with open(input_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
     except Exception as e:
         print(f"Error loading json: {e}")
@@ -56,7 +69,6 @@ def load_majors():
     sorted_cats = dict(sorted(categories.items()))
 
     # JSON 파일로 저장
-    output_path = '/home/maroco/major_mentor/backend/data/major_categories.json'
     try:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(sorted_cats, f, ensure_ascii=False, indent=2)

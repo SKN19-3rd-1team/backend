@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 # .env 파일에서 환경 변수 로드
-env_path = PROJECT_ROOT / '.env'
+env_path = PROJECT_ROOT / ".env"
 load_dotenv(dotenv_path=env_path)
 
 
@@ -28,32 +28,53 @@ class Settings:
 
     모든 설정값은 .env 파일에서 읽어오며, 기본값도 제공합니다.
     """
+
     # API 키
-    openai_api_key: str = os.getenv('OPENAI_API_KEY', '')
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
 
     # 데이터 경로 설정
-    data_dir: str = os.getenv('DATA_DIR', 'backend/data')  # 데이터 디렉토리
-    raw_json: str = os.getenv('RAW_JSON', 'backend/data/merged_university_courses.json')  # 원본 JSON 파일 (glob 패턴 지원)
-    vector_store_path: str = os.getenv('VECTORSTORE_PATH', 'backend/data/processed/courses.parquet')  # 미사용 (레거시)
-    vectorstore_dir: str = os.getenv('VECTORSTORE_DIR', 'backend/data/vector_db')  # Vector DB 저장 경로
-    major_detail_path: str = os.getenv('MAJOR_DETAIL_PATH', 'backend/data/major_detail.json')  # 전공 세부 정보 데이터
+    data_dir: str = os.getenv("DATA_DIR", "backend/data")  # 데이터 디렉토리
+    vectorstore_dir: str = os.getenv(
+        "VECTORSTORE_DIR", "backend/data/vector_db"
+    )  # Vector DB 저장 경로
+
+    # MySQL Database 설정
+    mysql_host: str = os.getenv("MYSQL_HOST", "localhost")
+    mysql_port: int = int(os.getenv("MYSQL_PORT", "3306"))
+    mysql_user: str = os.getenv("MYSQL_USER", "root")
+    mysql_password: str = os.getenv("MYSQL_PASSWORD", "")
+    mysql_db: str = os.getenv("MYSQL_DB", "unigo_db")
+
+    @property
+    def database_url(self) -> str:
+        """SQLAlchemy용 Database Connection URL 생성"""
+        # 패스워드가 있는 경우와 없는 경우 처리
+        if self.mysql_password:
+            return f"mysql+pymysql://{self.mysql_user}:{self.mysql_password}@{self.mysql_host}:{self.mysql_port}/{self.mysql_db}"
+        return f"mysql+pymysql://{self.mysql_user}@{self.mysql_host}:{self.mysql_port}/{self.mysql_db}"
 
     # LLM 설정
-    llm_provider: str = os.getenv('LLM_PROVIDER', 'openai')  # LLM 제공자: openai, ollama, huggingface
-    model_name: str = os.getenv('MODEL_NAME', 'gpt-4o-mini')  # 사용할 모델 이름
+    llm_provider: str = os.getenv(
+        "LLM_PROVIDER", "openai"
+    )  # LLM 제공자: openai, ollama, huggingface
+    model_name: str = os.getenv("MODEL_NAME", "gpt-4o-mini")  # 사용할 모델 이름
 
     # 임베딩 설정
-    embedding_model_name: str = os.getenv('EMBEDDING_MODEL_NAME', 'text-embedding-3-small')  # 임베딩 모델 (한국어 특화)
-    embedding_provider: str = os.getenv('EMBEDDING_PROVIDER', 'openai')  # 임베딩 제공자: openai, huggingface
+    embedding_model_name: str = os.getenv(
+        "EMBEDDING_MODEL_NAME", "text-embedding-3-small"
+    )  # 임베딩 모델 (한국어 특화)
+    embedding_provider: str = os.getenv(
+        "EMBEDDING_PROVIDER", "openai"
+    )  # 임베딩 제공자: openai, huggingface
 
     # Pinecone 설정 (전공 벡터 인덱스용)
-    pinecone_api_key: str = os.getenv('PINECONE_API_KEY', '')
-    pinecone_environment: str = os.getenv('PINECONE_ENVIRONMENT', '')
-    pinecone_region: str = os.getenv('PINECONE_REGION', '')
-    pinecone_cloud: str = os.getenv('PINECONE_CLOUD', 'aws')
-    pinecone_index_name: str = os.getenv('PINECONE_INDEX_NAME', 'majors-index')
-    pinecone_namespace: str = os.getenv('PINECONE_NAMESPACE', 'majors')
-    pinecone_dimension: int = int(os.getenv('PINECONE_DIMENSION', '0') or '0')
+    pinecone_api_key: str = os.getenv("PINECONE_API_KEY", "")
+    pinecone_environment: str = os.getenv("PINECONE_ENVIRONMENT", "")
+    pinecone_region: str = os.getenv("PINECONE_REGION", "")
+    pinecone_cloud: str = os.getenv("PINECONE_CLOUD", "aws")
+    pinecone_index_name: str = os.getenv("PINECONE_INDEX_NAME", "majors-index")
+    pinecone_namespace: str = os.getenv("PINECONE_NAMESPACE", "majors")
+    pinecone_dimension: int = int(os.getenv("PINECONE_DIMENSION", "0") or "0")
 
 
 def get_settings() -> Settings:
@@ -64,6 +85,7 @@ def get_settings() -> Settings:
         Settings: .env 파일에서 로드된 설정값을 담은 Settings 인스턴스
     """
     return Settings()
+
 
 def get_llm():
     """

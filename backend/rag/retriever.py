@@ -13,6 +13,7 @@
 2. Pinecone 벡터 DB에서 유사한 전공 문서 검색 (코사인 유사도)
 3. 문서 타입별 점수를 가중치 적용하여 전공별로 집계
 """
+
 # backend/rag/retriever.py
 from dataclasses import dataclass
 from typing import Dict, List, Any
@@ -34,14 +35,14 @@ class SearchHit:
 
 def search_major_docs(
     query_embedding: List[float],
-    top_k: int = 50,
+    top_k: int = 150,
 ) -> List[SearchHit]:
     """
     Pinecone 전공 인덱스에서 주어진 임베딩과 가장 유사한 문서들을 조회한다.
 
     Args:
         query_embedding: 사용자 질의/프로필을 임베딩한 벡터 값
-        top_k: 상위 몇 개의 문서를 반환할지 결정 (기본 50개)
+        top_k: 상위 몇 개의 문서를 반환할지 결정 (기본 150개로 상향 조정하여 Recall 개선)
 
     Returns:
         SearchHit 객체 리스트 (문서별 점수, 메타데이터 포함)
@@ -54,6 +55,7 @@ def search_major_docs(
         )
     except AttributeError:
         # langchain_pinecone < 0.2.16 버전 호환: with_relevance_scores 헬퍼가 없을 때 대체 경로 사용
+        # 구버전 라이브러리 사용 시 발생할 수 있는 호환성 문제를 해결하기 위한 예외 처리입니다.
         results = vectorstore.similarity_search_by_vector_with_score(
             embedding=query_embedding,
             k=top_k,
@@ -99,7 +101,9 @@ def aggregate_major_scores(
         doc_type_weights: doc_type → 가중치 매핑 딕셔너리
 
     Returns:
-        major_id를 키로 하고 가중 합산 점수를 값으로 가지는 딕셔너리
+        major_id를 키로 하고 가중 합산 점수를 값으로 가지는 딕셔너리.
+        여러 문서(summary, subjects, jobs 등)에서 검색된 결과를 전공별로 통합하여,
+        다양한 측면에서 관련성이 높은 전공이 상위에 오르도록 합니다.
     """
     # 전공별 doc_type 최고 점수를 저장
     per_major: Dict[str, Dict[str, float]] = {}

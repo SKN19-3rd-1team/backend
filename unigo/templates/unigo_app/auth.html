@@ -1,0 +1,20 @@
+{% extends "unigo_app/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="card-container">
+    <div class="card">
+        <h1 class="title">환영합니다.</h1>
+        <p class="subtitle">AI 기술로 당신에게 어울리는 대학/전공 상담 및 진로 로드맵 설계를 도와드립니다.</p>
+        <img src="{% static 'images/rabbit.png' %}" alt="Hero Image" class="hero-img"
+            onerror="this.style.backgroundColor='#ccc'">
+        <div class="button-row">
+            <button class="btn-primary" id="btn-signin">로그인</button>
+            <button class="btn-outline" id="btn-signup">회원가입</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% endblock %}

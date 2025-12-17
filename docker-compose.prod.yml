@@ -1,0 +1,75 @@
+services:
+  # Django 웹 애플리케이션 서비스
+  web:
+    build: .
+    container_name: unigo_web
+    command: gunicorn --bind 0.0.0.0:8000 unigo.wsgi:application
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    env_file:
+      - .env
+    environment:
+      # Prod에서는 내부 DB 컨테이너 사용 (host.docker.internal 아님)
+      - MYSQL_HOST=db
+      - MYSQL_PORT=3306
+    expose:
+      - "8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - unigo_network
+
+  # MySQL 데이터베이스 서비스
+  db:
+    image: mysql:8.0
+    container_name: unigo_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DB}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/data/db_init:/docker-entrypoint-initdb.d
+    expose:
+      - "3306"
+    # 보안상 Prod에서는 3306 포트를 호스트에 노출하지 않음 (같은 네트워크 내 web만 접근)
+    # ports:
+    #   - "3306:3306" 
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - unigo_network
+
+  # Nginx 리버스 프록시 서비스
+  nginx:
+    image: nginx:1.25
+    container_name: unigo_nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    depends_on:
+      - web
+    networks:
+      - unigo_network
+
+# 볼륨 정의
+volumes:
+  mysql_data:
+  static_volume:
+  media_volume:
+
+# 네트워크 정의
+networks:
+  unigo_network:
+    driver: bridge

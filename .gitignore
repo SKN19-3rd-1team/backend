@@ -1,17 +1,96 @@
-# vscocde
-.vscode
-.claude
-
-# Key
+# ===========================
+# Security / Secrets
+# ===========================
 .env
+.env.local
+.env.*.local
+secrets.json
 
-# pycache
-__pycache__
+# Keep .env.example for reference
+!*.example
 
-# data
-backend/data/vector_db
-# backend/data/
+# ===========================
+# Python / Django
+# ===========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# AGENTS
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# ===========================
+# Virtual Environments
+# ===========================
+venv/
+env/
+.env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ===========================
+# IDEs / Text Editors
+# ===========================
+# VS Code
+.vscode/
+# except settings that might be shared (optional)
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# PyCharm / IntelliJ
+.idea/
+
+# Mac / Windows
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===========================
+# Project Specific
+# ===========================
+# Node
+node_modules/
+
+# Agent related
+.claude
+.agent
 AGENTS.md
 CLAUDE.md
+
+# Large Data / Cache
+backend/data/vector_db/
+# backend/data/major_detail.json (Keep this tracked unless it gets too big)
+
+# Migration tool logs (if any)
+load_data.log
+
+# test scripts
+backend/scripts/test

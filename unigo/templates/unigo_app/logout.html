@@ -1,0 +1,23 @@
+{% load static %}
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Logging out...</title>
+  </head>
+  <body>
+    <p>로그아웃 중입니다...</p>
+    <script>
+      try {
+        sessionStorage.removeItem('unigo.app.chatHistory');
+        sessionStorage.removeItem('unigo.app.onboarding');
+        sessionStorage.removeItem('unigo.app.resultPanel');
+        sessionStorage.removeItem('unigo.app.currentConversationId');
+      } catch (e) {
+        console.warn('Failed to clear sessionStorage on logout page', e);
+      }
+      window.location.href = "{% url 'unigo_app:auth' %}";
+    </script>
+  </body>
+</html>

@@ -1,0 +1,123 @@
+{% extends "unigo_app/base.html" %}
+{% load static %}
+
+{% block title %}Unigo - Chat{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chat.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-layout">
+    <aside class="action-toolbar" aria-label="빠른 실행 아이콘">
+        <button class="action-btn" aria-label="새 채팅">
+            <svg viewBox="0 0 32 32" aria-hidden="true">
+                <path d="M16 8v16M8 16h16" />
+            </svg>
+        </button>
+        <button class="action-btn" aria-label="폴더">
+            <svg viewBox="0 0 32 32" aria-hidden="true">
+                <path d="M4 24V10h9l2 4h13v10H4z" />
+            </svg>
+        </button>
+        <button class="action-btn" aria-label="정보">
+            <svg viewBox="0 0 32 32" aria-hidden="true">
+                <path d="M16 6l3 6 6 3-6 3-3 6-3-6-6-3 6-3z" />
+            </svg>
+        </button>
+    </aside>
+
+    <div class="board-grid">
+        <section class="board chat-board" aria-label="대화 영역">
+            <div class="chat-canvas">
+                <!-- JS로 메시지가 추가됩니다 -->
+            </div>
+
+            <div class="chat-input-row">
+                <input type="text" class="chat-input" aria-label="메시지 입력">
+                <button class="chat-send-btn" id="chat-send-btn" aria-label="전송">
+                    <span class="send-icon"></span>
+                </button>
+            </div>
+            <p class="chat-note">AI는 실수할 수도 있습니다.</p>
+        </section>
+
+        <section class="board setting-board" aria-label="챗봇 결과 패널">
+            <div class="result-card">
+                제가 당신에게 추천드리는 학과들로는 생명공학, 컴퓨터공학, AI융합전공, 데이터사이언스과, 소프트웨어공학과 등이 있으며 추가적으로 물리학과, 천문학 등도 고려하실 수 있습니다.
+                <br><br>
+                이외 더 자세한 학과정보 및 진로상담이 필요하시면 채팅창에 추가 질문을 해주세요.
+            </div>
+            <div class="conv-list-container"></div>
+            <!-- TODO: 이후 챗봇 시스템이 연결되면 우측 패널에 실제 추천 결과를 렌더링할 예정 -->
+            {% if custom_image_url %}
+            <img src="{{ custom_image_url }}" alt="User Custom Character" class="result-rabbit"
+                style="border-radius: 20px;">
+            {% else %}
+            <img src="{% get_static_prefix %}images/{{ character_image|default:'rabbit' }}.png" alt="User Character"
+                class="result-rabbit">
+            {% endif %}
+        </section>
+
+        <!-- 대화 목록 템플릿 -->
+        <template id="conv-list-template">
+            <div class="conv-list">
+                <div class="conv-list-header">
+                    <h3 class="conv-list-title">과거 대화 목록</h3>
+                    <button type="button" class="conv-back-btn">닫기</button>
+                </div>
+                <div class="conv-list-scroll">
+                    <ul class="conv-list-ul"></ul>
+                </div>
+            </div>
+        </template>
+
+        <!-- 개별 아이템 템플릿 추가 -->
+        <template id="conv-item-template">
+            <li data-id="">
+                <div class="conv-list-header">
+                    <strong class="conv-title"></strong>
+                    <button type="button" class="conv-delete-btn" title="삭제">🗑️</button>
+                </div>
+                <small class="conv-meta"></small>
+                <span class="conv-preview"></span>
+            </li>
+        </template>
+
+        <!-- 요약 로딩 템플릿 -->
+        <template id="summary-loading-template">
+            <div class="result-header">
+                <strong class="result-title">대화 요약</strong>
+            </div>
+            <div class="result-loading">
+                <div class="spinner-container">
+                    <div class="spinner"></div>
+                    <div class="dots">
+                        <span>.</span>
+                        <span>.</span>
+                        <span>.</span>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- 요약 결과 템플릿 추가-->
+        <template id="summary-result-template">
+            <div class="result-header">
+                <strong class="result-title">대화 요약</strong>
+            </div>
+            <div class="result-content"></div>
+        </template>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if character_code %}
+<div id="chat-config" data-user-character="{{ character_code|default:'rabbit' }}"
+    data-user-custom-image="{{ custom_image_url|default:'' }}" style="display:none;">
+</div>
+{% endif %}
+<script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+<script src="{% static 'js/chat.js' %}"></script>
+{% endblock %}
